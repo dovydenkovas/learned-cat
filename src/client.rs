@@ -9,6 +9,7 @@ use whoami;
 use serde_json;
 
 mod network_structs;
+use network_structs::{Response, Request, Command, NextQuestion};
 
 
 // Структура аргументов командной строки.
@@ -41,16 +42,16 @@ fn main() {
 fn start_test(test_name: String) {
     println!("Ищу тест: {test_name}");
     
-    let request = network_structs::Request {
+    let request = Request {
         user: whoami::username(),
-        command: network_structs::Command::StartTest { test: test_name.clone() } 
+        command: Command::StartTest { test: test_name.clone() } 
     };
 
 
     match send_request(request) {
         Ok(response) => {
             match response {
-                network_structs::Response::StartTest { banner } => {
+                Response::StartTest { banner } => {
                     println!("{banner}");
                     let mut s = String::new();
                     let _ = stdin().read_line(&mut s);
@@ -69,7 +70,38 @@ fn start_test(test_name: String) {
 
 
 fn run_test(test_name: String) {
-    println!("{test_name}");
+    let mut next_question_request = Request {
+        user: whoami::username(),
+        command: Command::GetNextQuestion {
+            test: test_name,
+            previos_answer: vec![]
+        }
+    };
+
+    loop {
+        let response = send_request(next_question_request);
+
+        match response {
+            Response::GetNextQuestion { question } => {
+                match question {
+                    NextQuestion::Question { question, answers } => {
+                        ask_question(question, answers);
+                    },
+
+                    NextQuestion::TheEnd { result } => {
+                        println!("Тест завершен. Ваш результат: {}", result);
+                        break;
+                    }
+                }
+            },
+            _ => ()
+        }
+    }
+}
+
+
+fn ask_question(question: String, answers: Vec<String>) {
+
 }
 
 
