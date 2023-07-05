@@ -24,7 +24,8 @@ pub enum Command {
 pub enum Response {
      AvaliableTests { tests: Vec<String> },
      StartTest { banner: String },
-     GetNextQuestion { question: NextQuestion }        
+     GetNextQuestion { question: NextQuestion }, 
+     NotAllowedUser,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
