@@ -161,13 +161,13 @@ fn send_request(request: &network_structs::Request)
     -> Result<network_structs::Response, Box<dyn Error>> {
 
     let request = bincode::serialize(&request)?;
-    let mut response: Vec<u8> = vec![];
+    let mut response = [0 as u8; 5000];
 
     let mut stream = TcpStream::connect("127.0.0.1:65001")?;
     stream.write(&request)?;
-    stream.read(&mut response)?;
+    let n_bytes = stream.read(&mut response)?;
     
-    Ok(bincode::deserialize::<network_structs::Response>(&response)?)
+    Ok(bincode::deserialize::<network_structs::Response>(&response[..n_bytes])?)
 }
 
 
