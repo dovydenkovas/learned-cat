@@ -1,31 +1,45 @@
-#[macro_use] extern crate rocket;
-use serde_json::to_string as to_json;
+use std::io::Read;
+use std::fs::File;
+use std::error::Error;
+use std::path::Path;
+use std::net::{TcpListener, TcpStream};
+
+
 use serde_json::from_str as from_json;
-use rocket::State;
 
 mod network_structs;
 use network_structs::{Request, Response, Command, NextQuestion};
+mod parsetest;
+mod model;
+use parsetest::*;
+use model::*;
 
 
-#[launch]
-fn rocket() -> _ {
+fn handle_client(stream: &mut TcpStream) {
+    let mut request: Vec<u8> = vec![];
+    stream.read(&mut request);
+    println!("{:?}", request);
+}
+
+
+/// Open listener and run main loop
+fn main() {
     let presenter: Presenter = Presenter::new();
-    rocket::build()
-        .mount("/", routes![view])
-        .manage(Presenter::new())
+
+    println!("Запускаю главный цикл");
+    let listener = TcpListener::bind("127.0.0.1:65001").expect("Не могу открыть соединение");
+    
+    loop {    
+        for mut stream in listener.incoming() {
+            match stream {
+                Ok(mut stream) => handle_client(&mut stream),
+                Err(err) => eprintln!("{err:?}")
+            }
+        }
+        //let response = presenter.serve_connection(request);
+    }
 }
 
-
-#[post("/", format = "json", data = "<request>")]
-fn view(presenter: &State<Presenter>, request: &str) -> String {
-    match from_json::<Request>(request) {
-        Ok(request) => {
-            let response = presenter.serve_connection(request);        
-            to_json(&response).unwrap()
-        },
-        Err(_) => String::new(), // If request incorrect return empty string.
-    }    
-}
 
 
 
@@ -35,6 +49,12 @@ struct Presenter {
 
 impl Presenter {
     pub fn new() -> Presenter {
+        println!("Сервер");  
+        let settings = read_settings().expect("Не могу прочитать файл конфигурации settings.json.");
+        println!("Используемая конфигурация: {settings:?}");
+    
+        let quests = read_quests(&settings);
+
         Presenter { model: Model::new() }
     }
 
@@ -91,6 +111,26 @@ impl Presenter {
             } 
         }
     }
+}
+
+
+fn read_settings() -> Result<Settings, Box<dyn Error>> {
+    let mut file = File::open("settings.json")?;
+    let mut settings = String::new();
+    file.read_to_string(&mut settings)?;
+    Ok(from_json(&settings)?)
+}
+
+
+fn read_quests(settings: &Settings) -> Vec<Quest> {
+    let quests_base_path =  Path::new(&settings.quests_directory_path);
+    let mut quests: Vec<Quest> = vec![];
+    for test in &settings.quests_file_names {
+        let path =  quests_base_path.join(Path::new(&test));
+        quests.push(read_test(&path));
+    }
+
+    quests 
 }
 
 
