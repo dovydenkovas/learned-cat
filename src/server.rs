@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::io::{Read, Write};
 use std::fs::File;
 use std::error::Error;
 use std::path::Path;
@@ -15,28 +15,40 @@ use parsetest::*;
 use model::*;
 
 
-fn handle_client(stream: &mut TcpStream) {
-    let mut request: Vec<u8> = vec![];
-    stream.read(&mut request);
-    println!("{:?}", request);
+fn handle_client(stream: &mut TcpStream, presenter: &mut Presenter) -> Result<(), Box<dyn Error>> {
+    let mut request = [0 as u8; 5000];
+    let n_bytes = stream.read(&mut request)?;
+    
+    let request = bincode::deserialize::<network_structs::Request>(&request[0..n_bytes])?;
+    print!("{:?} -> ", request);
+    let response = presenter.serve_connection(request);
+    println!("{:?}", response);
+    let response = bincode::serialize(&response)?;
+    
+    stream.write(&response)?;
+    Ok(())
 }
 
 
 /// Open listener and run main loop
 fn main() {
-    let presenter: Presenter = Presenter::new();
+    let mut presenter: Presenter = Presenter::new();
 
     println!("Запускаю главный цикл");
     let listener = TcpListener::bind("127.0.0.1:65001").expect("Не могу открыть соединение");
     
     loop {    
-        for mut stream in listener.incoming() {
+        for stream in listener.incoming() {
             match stream {
-                Ok(mut stream) => handle_client(&mut stream),
+                Ok(mut stream) => {
+                    match handle_client(&mut stream, &mut presenter) {
+                        Ok(()) => (),
+                        Err(err) => eprintln!("{err:?}")
+                    }   
+                },
                 Err(err) => eprintln!("{err:?}")
             }
         }
-        //let response = presenter.serve_connection(request);
     }
 }
 
