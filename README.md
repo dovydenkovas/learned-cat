@@ -1,3 +1,5 @@
+[![Build](https://github.com/dovydenkovas/sshtest/actions/workflows/rust.yml/badge.svg)](https://github.com/dovydenkovas/sshtest/actions/workflows/rust.yml)
+
 # Программа автоматического тестирования в консоли
 Позволяет проводить тестирование в терминале. Каждый тест состоит из названия,
 описания и вопросов. Каждый вопрос содержит текст вопроса и варианты ответов.
