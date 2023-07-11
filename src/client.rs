@@ -56,9 +56,10 @@ fn start_test(test_name: String) {
             match response {
                 Response::StartTest { banner } => {
                     println!("{banner}");
+                    println!("Вы готовы начать тестирование? (Введите <да> или <нет>)");
+
                     let mut s = String::new();
                     let _ = stdin().read_line(&mut s);
-                    println!("Вы готовы начать тестирование? (Введите <да> или <нет>)");
                     match s.to_lowercase().as_str() {
                         "yes" | "y" | "да" | "д" => run_test(test_name),
                         _ => (),
