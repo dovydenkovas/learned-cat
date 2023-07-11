@@ -102,7 +102,6 @@ pub fn read_test(path: &Path) -> Quest {
                 } else { // multiline answer
                     let i: usize = question.answers.len();
                     if line.len() > 0 {
-                        println!("{}", line);
                         let answer = format!("{}\n  {}", question.answers[i-1], line);
                         question.answers[i-1] = answer;
                     }

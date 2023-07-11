@@ -3,7 +3,7 @@ use std::fs::File;
 use std::error::Error;
 use std::path::Path;
 use std::net::{TcpListener, TcpStream};
-
+use std::cmp::Eq;
 
 use serde_json::from_str as from_json;
 
@@ -18,9 +18,9 @@ use model::*;
 fn handle_client(stream: &mut TcpStream, presenter: &mut Presenter) -> Result<(), Box<dyn Error>> {
     let mut request = [0 as u8; 5000];
     let n_bytes = stream.read(&mut request)?;
-    
     let request = bincode::deserialize::<network_structs::Request>(&request[0..n_bytes])?;
-    print!("{:?} -> ", request);
+    
+    print!("[{}] {:?} -> ", chrono::Utc::now(),  request);
     let response = presenter.serve_connection(request);
     println!("{:?}", response);
     let response = bincode::serialize(&response)?;
@@ -33,10 +33,11 @@ fn handle_client(stream: &mut TcpStream, presenter: &mut Presenter) -> Result<()
 /// Open listener and run main loop
 fn main() {
     let mut presenter: Presenter = Presenter::new();
-
-    println!("Запускаю главный цикл");
-    let listener = TcpListener::bind("127.0.0.1:65001").expect("Не могу открыть соединение");
     
+    println!("* Открываю порт сервера: 127.0.0.1:65001");
+    let listener = TcpListener::bind("127.0.0.1:65001").expect("Не могу открыть соединение");
+
+    println!("* Запускаю главный цикл\n");
     loop {    
         for stream in listener.incoming() {
             match stream {
@@ -61,13 +62,17 @@ struct Presenter {
 
 impl Presenter {
     pub fn new() -> Presenter {
-        println!("Сервер");  
+        println!("Запуск сервера тестирования:");
+        println!("* Чтение файла конфигурации ");
         let settings = read_settings().expect("Не могу прочитать файл конфигурации settings.json.");
-        println!("Используемая конфигурация: {settings:?}");
-    
+        
+        println!("* Чтение тестов: ");
         let quests = read_quests(&settings);
+        for quest in &quests {
+            println!("  * {}", quest.name);
+        }
 
-        Presenter { model: Model::new() }
+        Presenter { model: Model::new(settings, quests) }
     }
 
     pub fn serve_connection(&self, request: Request) -> Response {
@@ -75,13 +80,13 @@ impl Presenter {
             match request.command {
                 Command::GetAvaliableTests => {
                     return Response::AvaliableTests {
-                        tests: self.get_avaliable_tests()
+                        tests: self.model.get_avaliable_tests()
                     };
                 },
 
                 Command::StartTest { test } => {
                     self.start_test(&request.user, &test); 
-                    let banner = self.get_banner(&test);
+                    let banner = self.model.get_banner(&test);
                     return Response::StartTest { banner: banner };
                 },
 
@@ -100,17 +105,13 @@ impl Presenter {
         true
     }
 
-    fn get_avaliable_tests(&self) -> Vec<String> {
-        vec!["calculate".to_string(), "alt".to_string()]
-    }
+   
 
     fn start_test(&self, username: &String, test: &String) {
     
     }
 
-    fn get_banner(&self, test: &String) -> String {
-        "".to_string()
-    }
+    
 
     fn get_next_question(
         &self, 
@@ -147,13 +148,28 @@ fn read_quests(settings: &Settings) -> Vec<Quest> {
 
 
 struct Model {
-    database: Database
+    database: Database,
+    settings: Settings,
+    quests: Vec<Quest>
 }
 
 
 impl Model {
-    pub fn new() -> Model {
-        Model { database: Database::new() }
+    pub fn new(settings: Settings, quests: Vec<Quest> ) -> Model {
+        Model { 
+            database: Database::new(), 
+            settings: settings,
+            quests: quests
+        }
+    }
+
+    fn get_banner(&self, test: &String) -> String {
+        for quest in &self.quests {
+            if quest.name.eq(test) {
+                return quest.banner.clone()
+            }
+        }
+        "".to_string()
     }
 
     pub fn init(&mut self) {
@@ -177,7 +193,14 @@ impl Model {
     pub fn is_allowed_user(&self, username: &String) -> bool {
        true 
     }
-
+    
+    fn get_avaliable_tests(&self) -> Vec<String> {
+        let mut res: Vec<String> = vec![];
+        for quest in &self.quests {
+            res.push(quest.name.clone());
+        }
+        res
+    }
 }
 
 
