@@ -9,8 +9,8 @@ use std::io::prelude::*;
 use clap::Parser;
 use whoami;
 
-mod network_structs;
-use network_structs::{Response, Request, Command, NextQuestion};
+mod model;
+use model::network::{Response, Request, Command, NextQuestion};
 
 
 
@@ -60,7 +60,7 @@ fn start_test(test_name: String) {
 
                     let mut s = String::new();
                     let _ = stdin().read_line(&mut s);
-                    match s.to_lowercase().as_str() {
+                    match s.trim().to_lowercase().as_str() {
                         "yes" | "y" | "да" | "д" => run_test(test_name),
                         _ => (),
                     }
@@ -104,46 +104,55 @@ fn run_test(test_name: String) {
 }
 
 /// Задает вопрос 
-fn ask_question(question: String, answers: Vec<String>) -> Vec<u8> {
-    println!("{question}");
+fn ask_question(question: String, answers: Vec<String>) -> Vec<u8> { 
+    'ask: loop {
+        println!("");
+        println!(" *** ");
+        println!("{question}");
 
-    for i in 0..answers.len() {
-        println!("{}) {}", i+1, answers[i]);
-    }
-
-    let mut answer = String::new();
-    std::io::stdin().read_line(&mut answer).expect("Не понимаю ответ");
-    
-    let mut answer: Vec<u8> = answer
-        .replace(",", " ")
-        .replace("  ", " ")
-        .trim()
-        .split(" ")
-        .map(|x| x.parse::<u8>().unwrap())
-        .collect();
-
-    for i in 0..answer.len() {
-        if answer[i] as usize <= answers.len() && answer[i] > 0 {
-            answer[i] -= 1;
+        for i in 0..answers.len() {
+            println!("{}) {}", i+1, answers[i]);
         }
-    }
 
-    answer
+        let mut answer = String::new();
+        if std::io::stdin().read_line(&mut answer).is_err() {
+            println!("Не понимаю ответ");
+            continue 'ask;
+        } 
+
+        let mut answer: Vec<u8> = answer
+            .replace(",", " ")
+            .replace("  ", " ")
+            .trim()
+            .split(" ")
+            .map(|x| x.parse::<u8>().unwrap())
+            .collect();
+
+        for i in 0..answer.len() {
+            if answer[i] as usize <= answers.len() && answer[i] > 0 {
+                answer[i] -= 1;
+            } else {
+                continue 'ask;
+            }
+        }
+
+        return answer;
+    }
 }
 
 
 
 /// Выводит перечень тестов.
 fn print_avaliable_tests() { 
-    let request = network_structs::Request {
+    let request = Request {
         user: whoami::username(),
-        command: network_structs::Command::GetAvaliableTests
+        command: Command::GetAvaliableTests
     };
 
     match send_request(&request) {
         Ok(response) => {
             match response {
-                network_structs::Response::AvaliableTests { tests } => {
+                Response::AvaliableTests { tests } => {
                     println!("Перечень доступных тестов:");
                     for test in tests {
                         println!("{test}");
@@ -158,8 +167,8 @@ fn print_avaliable_tests() {
 
 
 /// Осуществляет связь с сервером.
-fn send_request(request: &network_structs::Request)
-    -> Result<network_structs::Response, Box<dyn Error>> {
+fn send_request(request: &Request)
+    -> Result<Response, Box<dyn Error>> {
 
     let request = bincode::serialize(&request)?;
     let mut response = [0 as u8; 5000];
@@ -168,9 +177,15 @@ fn send_request(request: &network_structs::Request)
     stream.write(&request)?;
     let n_bytes = stream.read(&mut response)?;
     
-    Ok(bincode::deserialize::<network_structs::Response>(&response[..n_bytes])?)
+    let response = bincode::deserialize::<Response>(&response[..n_bytes])?;
+    match response {
+        Response::ServerError => {
+            println!("Произошли технические шоколадки :(");
+            println!("Организаторы уже в курсе, попробуйте вернуться к тестированию позже");
+            std::process::exit(1);
+        }
+
+        resp => return Ok(resp)
+    };
 }
-
-
-
 

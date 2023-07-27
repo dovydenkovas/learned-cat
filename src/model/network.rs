@@ -22,10 +22,11 @@ pub enum Command {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Response {
-     AvaliableTests { tests: Vec<String> },
-     StartTest { banner: String },
-     GetNextQuestion { question: NextQuestion }, 
-     NotAllowedUser,
+    AvaliableTests { tests: Vec<String> },
+    StartTest { banner: String },
+    GetNextQuestion { question: NextQuestion }, 
+    NotAllowedUser,
+    ServerError,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

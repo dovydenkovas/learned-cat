@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-use crate::model::{Quest, Question};
+use crate::model::{Test, Question};
 
 
 enum ParseState {
@@ -15,7 +15,7 @@ enum ParseState {
 
 
 /// Парсит Markdown файл тестирования
-pub fn read_test(path: &Path) -> Quest {
+pub fn read_test(path: &Path, test: &mut Test) {
     let file = File::open(path).expect(format!("Не могу открыть файл теста: {:?}", path).as_str());
     let file = BufReader::new(file);
       
@@ -117,11 +117,11 @@ pub fn read_test(path: &Path) -> Quest {
         questions.push(question);
     }
 
-    Quest {
-    name: name,
-    banner: banner,
-    questions: questions
+    if name.len() > 0 {
+        test.caption = name;
     }
+    test.banner = Some(banner);
+    test.questions = Some(questions);
 }
 
 
