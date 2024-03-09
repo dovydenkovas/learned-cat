@@ -1,0 +1,11 @@
+test_path = "tests" 
+result_path = "results"
+
+[[test]]
+name = "test"
+valid_users = ["asd"]
+duration = 3
+show_results = true
+number_of_attempts = 1
+shuffle_questions = true 
+
