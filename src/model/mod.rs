@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 /// Содержит структуры тестов
 use std::io::Read;
 use std::fs::File;
@@ -7,23 +5,31 @@ use std::error::Error;
 use std::path::Path;
 
 use toml::from_str as from_toml;
-use postgres::{Client as Database, NoTls};
 use serde::Deserialize;
 
 
-pub mod network;
 pub mod parsetest;
 pub mod init;
-use crate::model::parsetest::read_test;
+use parsetest::read_test;
 
 
 
 #[derive(Deserialize, Debug)]
 struct Settings {
-    tests_directory_path: Option<String>,
-    allowed_table_path: Option<Vec<String>>,
-    allowed_table: Option<Vec<String>>,
-    test: Option<Vec<Test>>
+    #[serde(default)]
+    tests_directory_path: String,
+
+    #[serde(default)]
+    tests: Vec<Test>
+}
+
+impl std::default::Default for Settings {
+    fn default() -> Settings {
+        Settings { 
+            tests_directory_path: "tests".to_string(),
+            tests: vec![]
+        }
+    }
 }
 
 
@@ -31,16 +37,31 @@ struct Settings {
 pub struct Test {
     /// Basic info
     pub caption: String,
-    pub banner: Option<String>,
+    pub banner: String,
     
     /// Variant parameters
-    pub questions: Option<Vec<Question>>,
-    pub question_number: Option<u16>,
-    pub shuffle: Option<bool>,
-    pub test_duration: Option<u16>,
+    pub questions: Vec<Question>,
+    pub question_number: u16,
+    pub shuffle: bool,
+    pub test_duration: u16,
     
     /// Castumization 
-    pub show_results: Option<bool>
+    pub show_results: bool
+}
+
+
+impl std::default::Default for Test {
+    fn default() -> Test {
+        Test { 
+            caption: "".to_string(), 
+            banner: "".to_string(),
+            questions: vec![], 
+            question_number: 0,
+            shuffle: false, 
+            test_duration: 0,
+            show_results: true
+        }
+    }
 }
 
 
@@ -59,11 +80,9 @@ struct User {
 }
 
 
-
-
 pub struct Model {
-    database: Database,
     settings: Settings,
+    results: std::collections::hash_map::HashMap<String, u16> 
 }
 
 
@@ -74,60 +93,49 @@ impl Model {
         println!("* Чтение тестов: ");
        
         // Read tests
-        let quests_base_path =  Path::new(&settings.tests_directory_path.unwrap_or("tests".to_string()));
-        match &mut settings.test {
-            Some(tests) => {
-                for test in tests {
-                    let path =  quests_base_path.join(Path::new(&(test.caption)));
-                    read_test(&path, test);
-                }
-            }
-
-            None => eprintln!("Нет ни одного теста")
-        };
-
-                
-        for test in &settings.test.unwrap() {
-            println!("  * {}", test.caption);
+        let quests_base_path = Path::new("tests"); // Path::new(&settings.tests_directory_path.unwrap_or("tests".to_string()));
+        for test in &mut settings.tests {
+            let path =  quests_base_path.join(Path::new(&(test.caption)));
+            read_test(&path, test);
         }
-        
-        let database = match 
-            Database::connect("host=localhost user=asd dbname=sshtest", NoTls) {
-            Ok(db) => db,
-            Err(err) => { 
-                eprintln!("{err:?}");
-                std::process::exit(1);
-            }
-            };
+                
+        /*for test in settings.test.unwrap().iter() {
+            println!("  * {}", test.caption);
+        }*/
 
-        Model {database, settings}
+        Model { 
+            settings, 
+            results: std::collections::hash_map::HashMap::new()
+        }
     }
 
     pub fn get_banner(&self, test: &String) -> String {
-        for quest in &self.settings.test.unwrap_or(vec![]) {
+        /*for quest in &self.settings.test.unwrap_or(vec![]) {
             if quest.caption.eq(test) {
                 return quest.banner.unwrap().clone()
             }
-        }
+        }*/
         "".to_string()
     }
 
     
 
-    pub fn is_allowed_user(&self, username: &String) -> bool {
-        self.settings.allowed_users.contains(username) 
+    pub fn is_allowed_user(&self, username: &String, test: &String) -> bool {
+        //self.settings.allowed_users.contains(username) 
+        true
     }
    
-    pub fn start_test(&self, username: &String, test: &String) -> network::Response {
+    pub fn start_test(&self, username: &String, test: &String) -> Result<String, ()> {
         // auth
         if !self.is_user_done_test(username, test) {
-            return network::Response::NotAllowedUser; 
+            return Err(()); 
         }
 
         // TODO generate questions
         let variant: Vec<u16> = self.generate_variant(&test);
         self.create_test_record(username, test, variant);
-        self.get_next_question(&username, &test, None)
+        //self.get_next_question(&username, &test, None)
+        Ok(self.get_banner(test))
     }
     
     fn generate_variant(&self, test: &String) -> Vec<u16> {
@@ -154,11 +162,11 @@ impl Model {
     }
 
 
-    pub fn get_avaliable_tests(&self) -> Vec<String> {
-        let mut res: Vec<String> = vec![];
-        for test in &self.settings.test {
+    pub fn get_avaliable_tests(&self, username: &String) -> Vec<(String, String)> {
+        let mut res: Vec<(String, String)> = vec![];
+        /*for test in &self.settings.test {
             res.push(test.caption.clone());
-        }
+        }*/
         res
     }
 
@@ -177,9 +185,9 @@ impl Model {
         &self, 
         username: &String, 
         test: &String,
-        previos_answer: Option<&Vec<u8>>) -> network::Response {
+        ) -> Question {
         
-        if self.is_user_done_test(username, test) {
+        /*if self.is_user_done_test(username, test) {
             network::Response::GetNextQuestion { 
                 question: network::NextQuestion::TheEnd {
                     result: "Молодец!".to_string()
@@ -192,17 +200,22 @@ impl Model {
                     answers: vec!["1".to_string(), "4".to_string(), "3".to_string()]
                 }
             }
-        }
+        }*/
+
+        Question {question: "111".to_string(), answers: ["tt".to_string()].to_vec(), correct_answers: [0].to_vec()}
     }
 
-    // Open database or create if not exist
-    //fn connect_database(&mut self) -> Database {
-    //    self.database.batch_execute("").unwrap();
-//        insert into student (login, is_allowed) VALUES ('student-1', true);
-// insert into test (caption) VALUES ('Python_test');
-    //}
+    pub fn is_next_question(&self, username: &String, test: &String) -> bool {
+        true
+    }
 
+    pub fn put_answer(&self, username: &String, test: &String, answer: &Vec<u8>) {
     
+    }
+
+    pub fn get_result(&self, username: &String, test: &String) -> String {
+        "aaa".to_string()
+    }
 }
 
 

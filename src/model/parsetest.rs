@@ -120,8 +120,8 @@ pub fn read_test(path: &Path, test: &mut Test) {
     if name.len() > 0 {
         test.caption = name;
     }
-    test.banner = Some(banner);
-    test.questions = Some(questions);
+    test.banner = banner;
+    test.questions = questions;
 }
 
 
