@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
-  "encoding/json"
+//  "encoding/json"
 )
 
 type Question struct {
@@ -18,7 +18,7 @@ type Question struct {
 
 
 type Response struct {
-  IsCorrect `json:"is_correct"`
+  IsCorrect bool `json:"is_correct"`
   IsTestDone bool `json:"is_test_done"`
   NextQuestion Question `json:"question"`
   Prompt string `json:"prompt"`  
@@ -38,9 +38,48 @@ func makeRequest(request string) []string{
 }
 
 
-func runTest(testname string) {
-  if makeRequest() 
+func getNextQuestion(testname string) (Question, error) {
+  return Question {
+    Text: "to be or not to be?",
+    Answers: []string{"to be", "no to be"},
+  }, nil
 }
+
+func initTest(testname string) bool {
+  return true 
+}
+
+
+func playQuestion(question Question) []int {
+  fmt.Println()
+  fmt.Println(question.Text)
+  for i, text := range question.Answers {
+    fmt.Printf("%d) %s\n", i+1, text);
+  }
+  
+  fmt.Print(">>> ")
+
+  var answer int 
+  fmt.Scanf("%d", &answer)
+
+  return []int{answer}
+}
+
+
+func sendAnswer(testname string, answer []int) {
+
+}
+
+
+func runTest(testname string) {
+  if initTest(testname) {
+    for question, err := getNextQuestion(testname); err == nil; {
+      answer := playQuestion(question);
+      sendAnswer(testname, answer);
+    }
+  }
+}
+
 
 func showTests() {
   testsnames := makeRequest("list") 
