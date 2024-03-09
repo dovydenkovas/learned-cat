@@ -4,14 +4,36 @@ use std::net::{TcpListener, TcpStream};
 
 use clap::arg;
 
-mod model;
-use model::network::Request; 
+mod network;
+use network::Request; 
 mod presenter;
 use presenter::Presenter;
+mod model;
 
 
 fn main() {
-    let arguments = clap::Command::new("sshtest-server")
+    let arguments = get_arguments();
+    
+    let root = std::path::Path::new("./sshtest");
+    if std::env::set_current_dir(&root).is_err() {
+        println!("Ошибка доступа к каталогу сервера {}. Проверьте, что каталог существует, и у процесса есть у нему доступ.", root.to_str().unwrap());
+    }
+
+    if arguments.subcommand_matches("init").is_some() {
+        model::init::init_server();
+    } else {
+        let mut presenter: Presenter = Presenter::new();
+        if arguments.subcommand_matches("start").is_some() {
+            server_mainloop(&mut presenter);
+        } else if let Some(arguments) = arguments.subcommand_matches("export-results") {
+            presenter.export_results(arguments.get_one::<String>("filename").unwrap().to_string());
+        } 
+    }
+}
+
+
+fn get_arguments() -> clap::ArgMatches {
+    clap::Command::new("sshtest-server")
         .version("0.1.0")
         .author("Aleksandr Dovydenkov. <asdovydenkov@gmail.com>")
         .about("Сервер автоматического тестирования в терминале. ")
@@ -33,23 +55,7 @@ fn main() {
                 .arg(arg!([filename]).required(true)),
         )
         
-        .get_matches();
-    
-    let root = std::path::Path::new("/opt/sshtest");
-    if std::env::set_current_dir(&root).is_err() {
-        println!("Ошибка доступа к каталогу сервера /opt/sshtest. Проверьте, что каталог существует, и у процесса есть у нему доступ.")
-    }
-
-    if arguments.subcommand_matches("init").is_some() {
-        model::init::init_server();
-    } else {
-        let mut presenter: Presenter = Presenter::new();
-        if arguments.subcommand_matches("start").is_some() {
-            server_mainloop(&mut presenter);
-        } else if let Some(arguments) = arguments.subcommand_matches("export-results") {
-            presenter.export_results(arguments.get_one::<String>("filename").unwrap().to_string());
-        } 
-    }
+        .get_matches()
 }
 
 

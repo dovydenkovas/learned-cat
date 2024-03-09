@@ -9,8 +9,8 @@ use std::io::prelude::*;
 use clap::Parser;
 use whoami;
 
-mod model;
-use model::network::{Response, Request, Command, NextQuestion};
+mod network;
+use network::{Response, Request, Command};
 
 
 
@@ -47,14 +47,15 @@ fn start_test(test_name: String) {
     
     let request = Request {
         user: whoami::username(),
-        command: Command::StartTest { test: test_name.clone() } 
+        test: test_name.clone(),
+        command: Command::StartTest 
     };
 
 
     match send_request(&request) {
         Ok(response) => {
             match response {
-                Response::StartTest { banner } => {
+                Response::TestStarted { banner } => {
                     println!("{banner}");
                     println!("Вы готовы начать тестирование? (Введите <да> или <нет>)");
 
@@ -76,28 +77,23 @@ fn start_test(test_name: String) {
 fn run_test(test_name: String) {
     let next_question_request = Request {
         user: whoami::username(),
-        command: Command::GetNextQuestion {
-            test: test_name,
-            previos_answer: vec![]
-        }
+        test: test_name.clone(),
+        command: Command::GetNextQuestion
     };
 
     loop {
         let response = send_request(&next_question_request);
 
         match response {
-            Ok(Response::GetNextQuestion { question }) => {
-                match question {
-                    NextQuestion::Question { question, answers } => {
-                        ask_question(question, answers);
-                    },
-
-                    NextQuestion::TheEnd { result } => {
-                        println!("Тест завершен. Ваш результат: {}", result);
-                        break;
-                    }
-                }
+            Ok(Response::NextQuestion { question, answers }) => {
+                ask_question(question, answers);
             },
+            
+            Ok(Response::End { result }) => {
+                println!("Тест завершен. Ваш результат: {}", result);
+                break;
+            },
+            
             _ => ()
         }
     }
@@ -146,6 +142,7 @@ fn ask_question(question: String, answers: Vec<String>) -> Vec<u8> {
 fn print_avaliable_tests() { 
     let request = Request {
         user: whoami::username(),
+        test: "".to_string(),
         command: Command::GetAvaliableTests
     };
 
@@ -154,8 +151,8 @@ fn print_avaliable_tests() {
             match response {
                 Response::AvaliableTests { tests } => {
                     println!("Перечень доступных тестов:");
-                    for test in tests {
-                        println!("{test}");
+                    for (test, result) in tests {
+                        println!("{test} {result}");
                     }
                 },
                 _ => eprintln!("Ошибка чтения списка тестов."),
