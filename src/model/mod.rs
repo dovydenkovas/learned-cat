@@ -3,6 +3,7 @@ use std::io::Read;
 use std::fs::File;
 use std::error::Error;
 use std::path::Path;
+use std::cmp;
 
 use toml::from_str as from_toml;
 use serde::Deserialize;
@@ -41,12 +42,14 @@ pub struct Test {
     
     /// Variant parameters
     pub questions: Vec<Question>,
-    pub question_number: u16,
+    pub question_number: usize,
     pub shuffle: bool,
     pub test_duration: u16,
     
     /// Castumization 
-    pub show_results: bool
+    pub show_results: bool,
+
+    allowed_users: Vec<String>
 }
 
 
@@ -59,13 +62,14 @@ impl std::default::Default for Test {
             question_number: 0,
             shuffle: false, 
             test_duration: 0,
-            show_results: true
+            show_results: true,
+            allowed_users: vec![]
         }
     }
 }
 
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Question {
     pub question: String, 
     pub answers: Vec<String>,
@@ -79,10 +83,18 @@ struct User {
     allowed_tests: Vec<String>,
 }
 
+#[derive(Debug)]
+struct Variant {
+    questions: Vec<Question>,
+    answers: Vec<Vec<u8>>,
+    current_question: usize,
+    result: usize, 
+}
+
 
 pub struct Model {
     settings: Settings,
-    results: std::collections::hash_map::HashMap<String, u16> 
+    results: std::collections::hash_map::HashMap<String, Variant> 
 }
 
 
@@ -93,15 +105,15 @@ impl Model {
         println!("* Чтение тестов: ");
        
         // Read tests
-        let quests_base_path = Path::new("tests"); // Path::new(&settings.tests_directory_path.unwrap_or("tests".to_string()));
+        let quests_base_path = Path::new(&settings.tests_directory_path);
         for test in &mut settings.tests {
             let path =  quests_base_path.join(Path::new(&(test.caption)));
             read_test(&path, test);
         }
                 
-        /*for test in settings.test.unwrap().iter() {
+        for test in &settings.tests {
             println!("  * {}", test.caption);
-        }*/
+        }
 
         Model { 
             settings, 
@@ -109,72 +121,70 @@ impl Model {
         }
     }
 
-    pub fn get_banner(&self, test: &String) -> String {
-        /*for quest in &self.settings.test.unwrap_or(vec![]) {
-            if quest.caption.eq(test) {
-                return quest.banner.unwrap().clone()
-            }
-        }*/
-        "".to_string()
+    pub fn get_banner(&self, testname: &String) -> String {
+        let id = self.get_test_id_by_name(testname);
+        self.settings.tests[id].banner.clone()
     }
 
-    
 
-    pub fn is_allowed_user(&self, username: &String, test: &String) -> bool {
+    pub fn is_allowed_user(&self, username: &String, testname: &String) -> bool {
         //self.settings.allowed_users.contains(username) 
         true
     }
    
-    pub fn start_test(&self, username: &String, test: &String) -> Result<String, ()> {
+    pub fn start_test(&mut self, username: &String, test: &String) -> Result<String, ()> {
         // auth
         if !self.is_user_done_test(username, test) {
             return Err(()); 
         }
 
         // TODO generate questions
-        let variant: Vec<u16> = self.generate_variant(&test);
+        let variant = self.generate_variant(&test);
         self.create_test_record(username, test, variant);
         //self.get_next_question(&username, &test, None)
         Ok(self.get_banner(test))
     }
     
-    fn generate_variant(&self, test: &String) -> Vec<u16> {
-        vec![]     
+    fn generate_variant(&self, testname: &String) -> Variant {
+        // TODO shuffle 
+        let id = self.get_test_id_by_name(testname); 
+        let test = &self.settings.tests[id];
+        
+        let mut questions: Vec<Question> = vec![];
+        for i in 0..cmp::max(0, cmp::min(test.question_number, test.questions.len())) {
+            questions.push(test.questions[i].clone()); 
+        }
+
+        Variant {questions, answers: vec![], current_question: 0, result: 0 }
     }
 
-    fn create_test_record(&self, username: &String, test: &String, variant: Vec<u16>) {
-        /*for row in client.query("SELECT id, name, data FROM person", &[])? {
-            let id: i32 = row.get(0);
-            let name: &str = row.get(1);
-            let data: Option<&[u8]> = row.get(2);
+    fn get_test_id_by_name(&self, testname: &String) -> usize {
+        for i in 0..self.settings.tests.len() {
+            if &self.settings.tests[i].caption == testname {
+                return i 
+            }
+        }
+        0 // TODO
+    }
 
-            println!("found person: {} {} {:?}", id, name, data);
-        }*/
-
-
-        /*let name = "Ferris";
-        let data = None::<&[u8]>;
-        client.execute(
-            "INSERT INTO person (name, data) VALUES ($1, $2)",
-            &[&name, &data],
-        )?;*/
-
+    fn create_test_record(&mut self, username: &String, testname: &String, variant: Variant) {
+        self.results.insert(username.to_owned() + "@" + testname, variant); 
     }
 
 
     pub fn get_avaliable_tests(&self, username: &String) -> Vec<(String, String)> {
         let mut res: Vec<(String, String)> = vec![];
+        for test in &self.settings.tests {
+            if test.allowed_users.contains(username) {
+                res.push((test.caption.clone(), self.get_result(username, &test))) 
+            }
+        }
         /*for test in &self.settings.test {
             res.push(test.caption.clone());
         }*/
         res
     }
 
-    pub fn get_results(&self) -> Vec<String> {
-        // TODO
-        vec![] 
-    }
-    
     /// Return [true] if user done the test.
     fn is_user_done_test(&self, _username: &String, _test: &String) -> bool {
         // TODO
@@ -213,9 +223,23 @@ impl Model {
     
     }
 
-    pub fn get_result(&self, username: &String, test: &String) -> String {
-        "aaa".to_string()
+
+    fn get_result(&self, username: &String, test: &Test) -> String {
+        let result_mark = username.to_owned() + "@" + &test.caption;
+        if self.results.contains_key(&result_mark) {
+            self.results[&result_mark].result.to_string()
+        } else {
+            "".to_string() 
+        }
     }
+
+
+    pub fn get_result_by_testname(&self, username: &String, testname: &String) -> String {
+        let id = self.get_test_id_by_name(testname); 
+        let test = &self.settings.tests[id]; 
+        self.get_result(username, test)
+    }
+
 }
 
 
