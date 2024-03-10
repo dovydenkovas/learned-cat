@@ -21,6 +21,10 @@ struct Settings {
     tests_directory_path: String,
 
     #[serde(default)]
+    result_path: String,
+
+    #[serde(default)]
+    #[serde(rename="test")]
     tests: Vec<Test>
 }
 
@@ -28,7 +32,8 @@ impl std::default::Default for Settings {
     fn default() -> Settings {
         Settings { 
             tests_directory_path: "tests".to_string(),
-            tests: vec![]
+            result_path: "results".to_string(),
+            tests: vec![] 
         }
     }
 }
@@ -38,14 +43,19 @@ impl std::default::Default for Settings {
 pub struct Test {
     /// Basic info
     pub caption: String,
+
+    #[serde(default)]
     pub banner: String,
     
     /// Variant parameters
+    #[serde(default)]
     pub questions: Vec<Question>,
-    pub question_number: usize,
-    pub shuffle: bool,
-    pub test_duration: u16,
-    
+
+    pub questions_number: usize,
+    pub shuffle_questions: bool,
+    pub test_duration_minutes: u16,
+    pub number_of_attempts: u16,
+
     /// Castumization 
     pub show_results: bool,
 
@@ -59,11 +69,12 @@ impl std::default::Default for Test {
             caption: "".to_string(), 
             banner: "".to_string(),
             questions: vec![], 
-            question_number: 0,
-            shuffle: false, 
-            test_duration: 0,
+            questions_number: 0,
+            shuffle_questions: false, 
+            test_duration_minutes: 0,
             show_results: true,
-            allowed_users: vec![]
+            allowed_users: vec![], 
+            number_of_attempts: 1,
         }
     }
 }
@@ -97,11 +108,13 @@ impl Model {
         println!("* Чтение файла конфигурации ");
         let mut settings = read_settings().expect("Не могу прочитать файл конфигурации settings.json.");
         println!("* Чтение тестов: ");
-       
+        
+
+
         // Read tests
         let quests_base_path = Path::new(&settings.tests_directory_path);
         for test in &mut settings.tests {
-            let path =  quests_base_path.join(Path::new(&(test.caption)));
+            let path =  quests_base_path.join(Path::new(&(test.caption.to_owned() + ".md")));
             read_test(&path, test);
         }
                 
@@ -127,7 +140,7 @@ impl Model {
    
     pub fn start_test(&mut self, username: &String, test: &String) -> Result<String, ()> {
         // auth
-        if !self.is_user_done_test(username, test) {
+        if self.is_user_done_test(username, test) {
             return Err(()); 
         }
 
@@ -144,7 +157,7 @@ impl Model {
         let test = &self.settings.tests[id];
         
         let mut questions: Vec<Question> = vec![];
-        for i in 0..cmp::max(0, cmp::min(test.question_number, test.questions.len())) {
+        for i in 0..cmp::max(0, cmp::min(test.questions_number, test.questions.len())) {
             questions.push(test.questions[i].clone()); 
         }
 
