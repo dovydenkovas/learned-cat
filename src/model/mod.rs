@@ -77,13 +77,7 @@ pub struct Question {
 }
 
 
-#[derive(Debug)]
-struct User {
-    username: String,
-    allowed_tests: Vec<String>,
-}
-
-#[derive(Debug)]
+//#[derive(Debug)]
 struct Variant {
     questions: Vec<Question>,
     answers: Vec<Vec<u8>>,
@@ -114,11 +108,9 @@ impl Model {
         for test in &settings.tests {
             println!("  * {}", test.caption);
         }
-
-        Model { 
-            settings, 
-            results: std::collections::hash_map::HashMap::new()
-        }
+        
+        let results = std::collections::hash_map::HashMap::new();
+        Model { settings, results}
     }
 
     pub fn get_banner(&self, testname: &String) -> String {
@@ -128,8 +120,9 @@ impl Model {
 
 
     pub fn is_allowed_user(&self, username: &String, testname: &String) -> bool {
-        //self.settings.allowed_users.contains(username) 
-        true
+        let id = self.get_test_id_by_name(testname); 
+        let test = &self.settings.tests[id]; 
+        test.allowed_users.contains(username)
     }
    
     pub fn start_test(&mut self, username: &String, test: &String) -> Result<String, ()> {
@@ -191,36 +184,34 @@ impl Model {
         false 
     }
 
-    pub fn get_next_question(
-        &self, 
-        username: &String, 
-        test: &String,
-        ) -> Question {
+    pub fn get_next_question(&self, username: &String, testname: &String) -> Question {
+        let result_mark = username.to_owned() + "@" + &testname;
+        if self.results.contains_key(&result_mark) {
+            let id = self.results[&result_mark].current_question;
+            if self.results[&result_mark].result == 0 {
+                return self.results[&result_mark].questions[id].clone(); 
+            }
+        }
         
-        /*if self.is_user_done_test(username, test) {
-            network::Response::GetNextQuestion { 
-                question: network::NextQuestion::TheEnd {
-                    result: "Молодец!".to_string()
-                } 
-            }
-        } else {
-            network::Response::GetNextQuestion {
-                question: network::NextQuestion::Question {
-                    question: "2 + 2 = ?".to_string(),
-                    answers: vec!["1".to_string(), "4".to_string(), "3".to_string()]
-                }
-            }
-        }*/
-
+        // TODO
         Question {question: "111".to_string(), answers: ["tt".to_string()].to_vec(), correct_answers: [0].to_vec()}
     }
 
-    pub fn is_next_question(&self, username: &String, test: &String) -> bool {
-        true
+    pub fn is_next_question(&self, username: &String, testname: &String) -> bool {
+        let result_mark = username.to_owned() + "@" + &testname;
+        if self.results.contains_key(&result_mark) {
+            self.results[&result_mark].current_question < self.results[&result_mark].questions.len()
+        } else {
+           false 
+        }
     }
 
-    pub fn put_answer(&self, username: &String, test: &String, answer: &Vec<u8>) {
-    
+    pub fn put_answer(&mut self, username: &String, testname: &String, answer: &Vec<u8>) {
+        let result_mark = username.to_owned() + "@" + &testname;
+        if self.results.contains_key(&result_mark) {
+            self.results.get_mut(&result_mark).unwrap().answers.push(answer.clone()); 
+            self.results.get_mut(&result_mark).unwrap().current_question += 1;
+        }
     }
 
 
