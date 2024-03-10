@@ -10,7 +10,7 @@ impl Presenter {
         Presenter { model: Model::new() }
     }
 
-    pub fn serve_connection(&self, request: Request) -> Response {
+    pub fn serve_connection(&mut self, request: Request) -> Response {
         if !self.model.is_allowed_user(&request.user, &request.test) {
             return Response::NotAllowedUser;
         }
@@ -25,7 +25,7 @@ impl Presenter {
             Command::StartTest => {
                 match self.model.start_test(&request.user, &request.test) {
                     Ok(banner) =>  Response::TestStarted { banner },
-                    Err(_) => Response::End{ result: self.model.get_result(&request.user, &request.test) } 
+                    Err(_) => Response::End{ result: self.model.get_result_by_testname(&request.user, &request.test) } 
                 }
             },
 
@@ -38,7 +38,7 @@ impl Presenter {
                         answers: question.answers,
                     }
                 } else {
-                    Response::End { result: self.model.get_result(&request.user, &request.test) }
+                    Response::End { result: self.model.get_result_by_testname(&request.user, &request.test) }
                 }
             },
 
@@ -47,7 +47,7 @@ impl Presenter {
                 if self.model.is_next_question(&request.user, &request.test) {
                     Response::Ok 
                 } else {
-                    Response::End { result: self.model.get_result(&request.user, &request.test) }
+                    Response::End { result: self.model.get_result_by_testname(&request.user, &request.test) }
                 }
             },
 
