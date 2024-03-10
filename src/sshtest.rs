@@ -66,6 +66,11 @@ fn start_test(test_name: String) {
                         _ => (),
                     }
                 },
+                
+                Response::End { result } => {
+                    println!("Тест завершен. Ваш результат: {}", result);
+                },
+
                 _ => eprintln!("Ошибка запуска теста."),
             }
         },
@@ -86,7 +91,22 @@ fn run_test(test_name: String) {
 
         match response {
             Ok(Response::NextQuestion { question, answers }) => {
-                ask_question(question, answers);
+                let answers = ask_question(question, answers);
+                let put_answer_request = Request {
+                    user: whoami::username(),
+                    test: test_name.clone(),
+                    command: Command::PutAnswer { answer: answers } 
+                };
+
+                match send_request(&put_answer_request) {
+                    Ok(Response::End { result }) => {
+                        println!("Тест завершен. Ваш результат: {}", result);
+                        break;
+                    }, 
+
+                    _ => (),
+                }
+                
             },
             
             Ok(Response::End { result }) => {

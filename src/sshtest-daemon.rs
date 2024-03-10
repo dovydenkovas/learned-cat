@@ -14,7 +14,7 @@ mod model;
 fn main() {
     let arguments = get_arguments();
     
-    let root = std::path::Path::new("./sshtest");
+    let root = std::path::Path::new("/home/asd/code/desktop/sshtest/sshtest-dir");
     if std::env::set_current_dir(&root).is_err() {
         println!("Ошибка доступа к каталогу сервера {}. Проверьте, что каталог существует, и у процесса есть у нему доступ.", root.to_str().unwrap());
     }
