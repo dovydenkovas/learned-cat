@@ -1,5 +1,6 @@
 tests_directory_path = "tests"
-allowed_table_path = "users.csv"  
+result_path = "results"
+
 
 [[test]]
 caption="linux"
@@ -7,6 +8,9 @@ questions_number = 2
 shuffle_questions = true 
 test_duration_minutes = 5
 show_results = true
+allowed_users = ["asd"]
+number_of_attempts = 1
+
 
 [[test]]
 caption="python"
@@ -14,8 +18,7 @@ questions_number = 2
 shuffle_questions = true 
 test_duration_minutes = 5
 show_results = true
-
-
-
+allowed_users = ["asd"]
+number_of_attempts = 1
 
 
