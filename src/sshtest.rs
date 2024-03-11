@@ -189,7 +189,7 @@ fn send_request(request: &Request)
 
     let request = bincode::serialize(&request)?;
     let mut response = [0 as u8; 5000];
-
+    // TODO parse server address from env
     let mut stream = TcpStream::connect("127.0.0.1:65001")?;
     stream.write(&request)?;
     let n_bytes = stream.read(&mut response)?;

@@ -15,6 +15,7 @@ enum ParseState {
 
 
 /// Парсит Markdown файл тестирования
+/// TODO read banner with *** 
 pub fn read_test(path: &Path, test: &mut Test) {
     let file = File::open(path).expect(format!("Не могу открыть файл теста: {:?}", path).as_str());
     let file = BufReader::new(file);
