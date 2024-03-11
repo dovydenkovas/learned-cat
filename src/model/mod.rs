@@ -102,7 +102,7 @@ impl std::default::Default for Model {
 }
 
 
-
+// TODO save result on test done 
 impl Model {
     pub fn new() -> Model {
         println!("* Чтение файла конфигурации ");
@@ -125,6 +125,7 @@ impl Model {
         settings
     }
 
+
     pub fn get_banner(&self, testname: &String) -> String {
         let id = self.get_test_id_by_name(testname);
         self.tests[id].banner.clone()
@@ -136,21 +137,25 @@ impl Model {
         let test = &self.tests[id]; 
         test.allowed_users.contains(username)
     }
-   
+  
+
     pub fn start_test(&mut self, username: &String, test: &String) -> Result<String, ()> {
         // auth
         if self.is_user_done_test(username, test) {
             return Err(()); 
         }
 
+        // TODO check number_of_attempts 
         // TODO generate questions
         let variant = self.generate_variant(&test);
         self.create_test_record(username, test, variant);
         //self.get_next_question(&username, &test, None)
         Ok(self.get_banner(test))
     }
-    
+ 
+
     fn generate_variant(&self, testname: &String) -> Variant {
+        // TODO select n questions 
         // TODO shuffle 
         let id = self.get_test_id_by_name(testname); 
         let test = &self.tests[id];
@@ -163,14 +168,16 @@ impl Model {
         Variant {questions, answers: vec![], current_question: 0, result: 0 }
     }
 
+
     fn get_test_id_by_name(&self, testname: &String) -> usize {
         for i in 0..self.tests.len() {
             if &self.tests[i].caption == testname {
                 return i 
             }
         }
-        0 // TODO
+        0 // TODO err if test not exist 
     }
+
 
     fn create_test_record(&mut self, username: &String, testname: &String, variant: Variant) {
         self.results.insert(username.to_owned() + "@" + testname, variant); 
@@ -184,20 +191,20 @@ impl Model {
                 res.push((test.caption.clone(), self.get_result(username, &test))) 
             }
         }
-        /*for test in &self.settings.test {
-            res.push(test.caption.clone());
-        }*/
         res
     }
 
     /// Return [true] if user done the test.
     fn is_user_done_test(&self, _username: &String, _test: &String) -> bool {
-        // TODO
+        // TODO is user done test (all attempts)
         false 
     }
+    
+    /// TODO Add result collector: Automatically end tests with time is over
 
     pub fn get_next_question(&self, username: &String, testname: &String) -> Question {
         let result_mark = username.to_owned() + "@" + &testname;
+        // TODO time of test not over
         if self.results.contains_key(&result_mark) {
             let id = self.results[&result_mark].current_question;
             if self.results[&result_mark].result == 0 {
@@ -205,12 +212,13 @@ impl Model {
             }
         }
         
-        // TODO
+        // TODO error if there are no next question
         Question {question: "111".to_string(), answers: ["tt".to_string()].to_vec(), correct_answers: [0].to_vec()}
     }
 
     pub fn is_next_question(&self, username: &String, testname: &String) -> bool {
         let result_mark = username.to_owned() + "@" + &testname;
+        // TODO check time of test is over 
         if self.results.contains_key(&result_mark) {
             self.results[&result_mark].current_question < self.results[&result_mark].questions.len()
         } else {
@@ -220,6 +228,7 @@ impl Model {
 
     pub fn put_answer(&mut self, username: &String, testname: &String, answer: &Vec<u8>) {
         let result_mark = username.to_owned() + "@" + &testname;
+        // TODO check test not done 
         if self.results.contains_key(&result_mark) {
             self.results.get_mut(&result_mark).unwrap().answers.push(answer.clone()); 
             self.results.get_mut(&result_mark).unwrap().current_question += 1;
@@ -232,7 +241,7 @@ impl Model {
         if self.results.contains_key(&result_mark) {
             self.results[&result_mark].result.to_string()
         } else {
-            "".to_string() 
+            "".to_string() // TODO error if there are not results 
         }
     }
 
@@ -241,8 +250,8 @@ impl Model {
         let id = self.get_test_id_by_name(testname); 
         let test = &self.tests[id]; 
         self.get_result(username, test)
+        // TODO Error is test not done 
     }
-
 }
 
 
@@ -254,6 +263,7 @@ fn read_settings() -> Result<Model, Box<dyn Error>> {
 }
 
 
+/// TODO load results
 fn load_results(result_path: &String) -> std::collections::hash_map::HashMap<String, Variant> {
     std::collections::hash_map::HashMap::new()
 }

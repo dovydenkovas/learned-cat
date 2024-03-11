@@ -14,7 +14,8 @@ impl Presenter {
         if !self.model.is_allowed_user(&request.user, &request.test) {
             return Response::NotAllowedUser;
         }
-
+        
+        // Better error check 
         match request.command {
             Command::GetAvaliableTests => {
                 Response::AvaliableTests {
@@ -59,6 +60,6 @@ impl Presenter {
         //self.model.get_results();   
 
         println!("Созраняю в файл {filename}.");
-        // TODO: !!
+        // TODO: export results
     }
 }
