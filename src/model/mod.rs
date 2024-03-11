@@ -15,27 +15,11 @@ use parsetest::read_test;
 
 
 
-#[derive(Deserialize, Debug)]
-struct Settings {
-    #[serde(default)]
-    tests_directory_path: String,
-
-    #[serde(default)]
-    result_path: String,
-
-    #[serde(default)]
-    #[serde(rename="test")]
-    tests: Vec<Test>
-}
-
-impl std::default::Default for Settings {
-    fn default() -> Settings {
-        Settings { 
-            tests_directory_path: "tests".to_string(),
-            result_path: "results".to_string(),
-            tests: vec![] 
-        }
-    }
+#[derive(Debug, Deserialize, Clone)]
+pub struct Question {
+    pub question: String, 
+    pub answers: Vec<String>,
+    pub correct_answers: Vec<usize>
 }
 
 
@@ -59,7 +43,7 @@ pub struct Test {
     /// Castumization 
     pub show_results: bool,
 
-    allowed_users: Vec<String>
+    pub allowed_users: Vec<String>
 }
 
 
@@ -80,15 +64,8 @@ impl std::default::Default for Test {
 }
 
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct Question {
-    pub question: String, 
-    pub answers: Vec<String>,
-    pub correct_answers: Vec<usize>
-}
 
-
-//#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 struct Variant {
     questions: Vec<Question>,
     answers: Vec<Vec<u8>>,
@@ -97,10 +74,33 @@ struct Variant {
 }
 
 
+#[derive(Deserialize, Debug)]
 pub struct Model {
-    settings: Settings,
-    results: std::collections::hash_map::HashMap<String, Variant> 
+    #[serde(default)]
+    tests_directory_path: String,
+
+    #[serde(default)]
+    result_path: String,
+
+    #[serde(default)]
+    #[serde(rename="test")]
+    tests: Vec<Test>,
+    
+    #[serde(default)]
+    results: std::collections::hash_map::HashMap<String, Variant>
 }
+
+impl std::default::Default for Model {
+    fn default() -> Model {
+        Model { 
+            tests_directory_path: "tests".to_string(),
+            result_path: "results".to_string(),
+            tests: vec![],
+            results:  std::collections::hash_map::HashMap::new()
+        }
+    }
+}
+
 
 
 impl Model {
@@ -108,8 +108,6 @@ impl Model {
         println!("* Чтение файла конфигурации ");
         let mut settings = read_settings().expect("Не могу прочитать файл конфигурации settings.json.");
         println!("* Чтение тестов: ");
-        
-
 
         // Read tests
         let quests_base_path = Path::new(&settings.tests_directory_path);
@@ -122,19 +120,20 @@ impl Model {
             println!("  * {}", test.caption);
         }
         
-        let results = std::collections::hash_map::HashMap::new();
-        Model { settings, results}
+        let results = load_results(&settings.result_path);
+        settings.results = results;
+        settings
     }
 
     pub fn get_banner(&self, testname: &String) -> String {
         let id = self.get_test_id_by_name(testname);
-        self.settings.tests[id].banner.clone()
+        self.tests[id].banner.clone()
     }
 
 
     pub fn is_allowed_user(&self, username: &String, testname: &String) -> bool {
         let id = self.get_test_id_by_name(testname); 
-        let test = &self.settings.tests[id]; 
+        let test = &self.tests[id]; 
         test.allowed_users.contains(username)
     }
    
@@ -154,7 +153,7 @@ impl Model {
     fn generate_variant(&self, testname: &String) -> Variant {
         // TODO shuffle 
         let id = self.get_test_id_by_name(testname); 
-        let test = &self.settings.tests[id];
+        let test = &self.tests[id];
         
         let mut questions: Vec<Question> = vec![];
         for i in 0..cmp::max(0, cmp::min(test.questions_number, test.questions.len())) {
@@ -165,8 +164,8 @@ impl Model {
     }
 
     fn get_test_id_by_name(&self, testname: &String) -> usize {
-        for i in 0..self.settings.tests.len() {
-            if &self.settings.tests[i].caption == testname {
+        for i in 0..self.tests.len() {
+            if &self.tests[i].caption == testname {
                 return i 
             }
         }
@@ -180,7 +179,7 @@ impl Model {
 
     pub fn get_avaliable_tests(&self, username: &String) -> Vec<(String, String)> {
         let mut res: Vec<(String, String)> = vec![];
-        for test in &self.settings.tests {
+        for test in &self.tests {
             if test.allowed_users.contains(username) {
                 res.push((test.caption.clone(), self.get_result(username, &test))) 
             }
@@ -240,14 +239,14 @@ impl Model {
 
     pub fn get_result_by_testname(&self, username: &String, testname: &String) -> String {
         let id = self.get_test_id_by_name(testname); 
-        let test = &self.settings.tests[id]; 
+        let test = &self.tests[id]; 
         self.get_result(username, test)
     }
 
 }
 
 
-fn read_settings() -> Result<Settings, Box<dyn Error>> {
+fn read_settings() -> Result<Model, Box<dyn Error>> {
     let mut file = File::open("settings.toml")?;
     let mut settings = String::new();
     file.read_to_string(&mut settings)?;
@@ -255,6 +254,9 @@ fn read_settings() -> Result<Settings, Box<dyn Error>> {
 }
 
 
+fn load_results(result_path: &String) -> std::collections::hash_map::HashMap<String, Variant> {
+    std::collections::hash_map::HashMap::new()
+}
 
 
 
