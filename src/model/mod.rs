@@ -7,6 +7,7 @@ use std::cmp;
 
 use toml::from_str as from_toml;
 use serde::Deserialize;
+use rand::seq::SliceRandom;
 
 
 pub mod parsetest;
@@ -37,7 +38,6 @@ pub struct Test {
     pub questions: Vec<Question>,
 
     pub questions_number: usize,
-    pub shuffle_questions: bool,
     pub test_duration_minutes: u16,
     pub number_of_attempts: u16,
 
@@ -55,7 +55,6 @@ impl std::default::Default for Test {
             banner: "".to_string(),
             questions: vec![], 
             questions_number: 0,
-            shuffle_questions: false, 
             test_duration_minutes: 0,
             show_results: true,
             allowed_users: vec![], 
@@ -180,15 +179,13 @@ impl Model {
  
 
     fn generate_variant(&self, testname: &String) -> ModelResult<Variant> {
-        // TODO select n questions 
-        // TODO shuffle 
         let id = self.get_test_id_by_name(testname)?; 
         let test = &self.tests[id];
         
-        let mut questions: Vec<Question> = vec![];
-        for i in 0..cmp::max(0, cmp::min(test.questions_number, test.questions.len())) {
-            questions.push(test.questions[i].clone()); 
-        }
+        let questions: Vec<Question> = test.questions
+            .choose_multiple(&mut rand::thread_rng(), test.questions_number)
+            .cloned()
+            .collect();
 
         Ok(Variant {questions, answers: vec![], current_question: 0, result: None })
     }
