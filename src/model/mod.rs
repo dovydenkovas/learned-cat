@@ -3,10 +3,9 @@ use std::io::Read;
 use std::fs::File;
 use std::error::Error;
 use std::path::Path;
-use std::cmp;
 
 use toml::from_str as from_toml;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use rand::seq::SliceRandom;
 
 
@@ -17,7 +16,7 @@ use parsetest::read_test;
 use errors::{ModelResult, ModelError};
 
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct Question {
     pub question: String, 
     pub answers: Vec<String>,
@@ -65,14 +64,18 @@ impl std::default::Default for Test {
 
 
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct Variant {
+    username: String,
+    testname: String,
+    timestamp: chrono::DateTime<chrono::Local>,
     questions: Vec<Question>,
     answers: Vec<Vec<u8>>,
     current_question: usize,
     result: Option<usize>, 
 }
 
+type TestResults = std::collections::hash_map::HashMap<String, Vec<Variant>>;
 
 #[derive(Deserialize, Debug)]
 pub struct Model {
@@ -90,7 +93,7 @@ pub struct Model {
     tests: Vec<Test>,
     
     #[serde(default)]
-    results: std::collections::hash_map::HashMap<String, Variant>
+    results: TestResults, 
 }
 
 impl std::default::Default for Model {
@@ -151,7 +154,7 @@ impl Model {
             return Err(ModelError::UserNotAllowed)
         }
         
-        if self.is_user_have_opened_variant()? {
+        if self.is_user_have_opened_variant(username, testname)? {
             return Err(ModelError::TestIsOpened(testname.clone()))
         }
 
@@ -159,26 +162,30 @@ impl Model {
             return Err(ModelError::TestIsDone) 
         }
 
-        let variant = self.generate_variant(testname)?;
+        let variant = self.generate_variant(username, testname)?;
         self.create_test_record(username, testname, variant);
         Ok(self.get_banner(testname)?)
     }
 
 
     /// Return [true] if user done the test.
-    fn is_user_done_test(&self, _username: &String, _test: &String) -> ModelResult<bool> {
+    fn is_user_done_test(&self, username: &String, test: &String) -> ModelResult<bool> {
         // TODO check number_of_attempts
         Ok(false) 
     }
 
 
-    pub fn is_user_have_opened_variant(&self) -> ModelResult<bool> {
-        // TODO check user have opened variant
+    pub fn is_user_have_opened_variant(&self, username: &String, testname: &String) -> ModelResult<bool> {
+        let result_mark = username.to_owned() + "@" + testname;
+        if self.results.contains_key(&result_mark) {
+            let variant = &self.results.get(&result_mark).unwrap().last().unwrap();
+            return Ok(variant.result.is_some());
+        }
         Ok(false)
     }
  
 
-    fn generate_variant(&self, testname: &String) -> ModelResult<Variant> {
+    fn generate_variant(&self, username: &String, testname: &String) -> ModelResult<Variant> {
         let id = self.get_test_id_by_name(testname)?; 
         let test = &self.tests[id];
         
@@ -187,7 +194,15 @@ impl Model {
             .cloned()
             .collect();
 
-        Ok(Variant {questions, answers: vec![], current_question: 0, result: None })
+        Ok(Variant {
+            username: username.clone(),
+            testname: testname.clone(),
+            timestamp: chrono::offset::Local::now(),
+            questions, 
+            answers: vec![], 
+            current_question: 0, 
+            result: None 
+        })
     }
 
 
@@ -203,7 +218,11 @@ impl Model {
 
 
     fn create_test_record(&mut self, username: &String, testname: &String, variant: Variant) {
-        self.results.insert(username.to_owned() + "@" + testname, variant); 
+        let result_mark = username.to_owned() + "@" + testname;
+        if !self.results.contains_key(&result_mark) {
+            self.results.insert(result_mark.clone(), vec![]);
+        }
+        self.results.get_mut(&result_mark).unwrap().push(variant); 
     }
 
 
@@ -221,30 +240,37 @@ impl Model {
         Ok(res)
     }
 
-
     
-    /// TODO Add result collector: Automatically end tests with time is over
-
-    pub fn get_next_question(&self, username: &String, testname: &String) -> ModelResult<Question> {
-        let result_mark = username.to_owned() + "@" + &testname;
+    fn is_test_time_is_over(&self, username: &String, testname: &String) -> bool {
         // TODO time of test not over
+        return false;
+    }
+    
+    pub fn get_next_question(&mut self, username: &String, testname: &String) -> ModelResult<Question> {
+        let result_mark = username.to_owned() + "@" + &testname;    
+        
         if !self.results.contains_key(&result_mark) {
             return Err(ModelError::VariantNotExist(result_mark.clone()))
         }
 
-        if self.results[&result_mark].result.is_some() {
+        if self.results[&result_mark].last().unwrap().result.is_some() {
             return Err(ModelError::TestIsDone) 
         }
+        
+        if self.is_test_time_is_over(username, testname) {
+            self.done_test(username, testname);
+            return Err(ModelError::TestIsDone)
+        }
 
-        let id = self.results[&result_mark].current_question;
-        return Ok(self.results[&result_mark].questions[id].clone()); 
+        let id = self.results[&result_mark].last().unwrap().current_question;
+        return Ok(self.results[&result_mark].last().unwrap().questions[id].clone()); 
     }
 
     pub fn is_next_question(&self, username: &String, testname: &String) -> ModelResult<bool> {
         let result_mark = username.to_owned() + "@" + &testname;
-        // TODO check time of test is over 
         if self.results.contains_key(&result_mark) {
-            Ok(self.results[&result_mark].current_question < self.results[&result_mark].questions.len())
+            Ok(self.results[&result_mark].last().unwrap().current_question 
+               < self.results[&result_mark].last().unwrap().questions.len())
         } else {
            Ok(false)
         }
@@ -252,11 +278,14 @@ impl Model {
 
     pub fn put_answer(&mut self, username: &String, testname: &String, answer: &Vec<u8>) -> ModelResult<()> {
         let result_mark = username.to_owned() + "@" + &testname;
-        // TODO check test not done 
         if self.results.contains_key(&result_mark) {
-            self.results.get_mut(&result_mark).unwrap().answers.push(answer.clone()); 
-            self.results.get_mut(&result_mark).unwrap().current_question += 1;
-            return Ok(())
+            let variant = &mut self.results.get_mut(&result_mark).unwrap().last_mut().unwrap();
+            if variant.result.is_none() {
+                variant.answers.push(answer.clone()); 
+                variant.current_question += 1;
+                return Ok(())
+            } 
+            return Err(ModelError::TestIsDone);
         }
         Err(ModelError::VariantNotExist(result_mark.clone()))
     }
@@ -265,7 +294,7 @@ impl Model {
     fn get_result(&self, username: &String, test: &Test) -> ModelResult<String> {
         let result_mark = username.to_owned() + "@" + &test.caption;
         if self.results.contains_key(&result_mark) {
-            match self.results[&result_mark].result {
+            match self.results[&result_mark].last().unwrap().result {
                 Some(result) => Ok(result.to_string()),
                 None => Err(ModelError::ResultNotExist(result_mark.clone()))
             }
@@ -281,6 +310,15 @@ impl Model {
         let test = &self.tests[id]; 
         Ok(self.get_result(username, test)?)
     }
+
+    pub fn collect_done_tests(&mut self) {
+        // TODO Add result collector: Automatically end tests with time is over
+        println!("Starting collector of done tests");
+    }
+
+    fn done_test(&mut self, username: &String, testname: &String) {
+        // TODO done test and calculate mark 
+    }
 }
 
 
@@ -293,7 +331,7 @@ fn read_settings() -> Result<Model, Box<dyn Error>> {
 
 
 /// TODO load results
-fn load_results(result_path: &String) -> std::collections::hash_map::HashMap<String, Variant> {
+fn load_results(result_path: &String) -> TestResults {
     std::collections::hash_map::HashMap::new()
 }
 
