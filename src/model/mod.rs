@@ -147,17 +147,35 @@ impl Model {
     }
   
 
-    pub fn start_test(&mut self, username: &String, test: &String) -> ModelResult<String> {
-        // auth
-        if self.is_user_done_test(username, test) {
-            return Err(ModelError::UserNotAllowed); 
+    pub fn start_test(&mut self, username: &String, testname: &String) -> ModelResult<String> {
+        if !self.is_allowed_user(username, testname)? {
+            return Err(ModelError::UserNotAllowed)
+        }
+        
+        if self.is_user_have_opened_variant()? {
+            return Err(ModelError::TestIsOpened(testname.clone()))
         }
 
-        // TODO check number_of_attempts 
-        // TODO generate questions
-        let variant = self.generate_variant(&test)?;
-        self.create_test_record(username, test, variant);
-        Ok(self.get_banner(test)?)
+        if self.is_user_done_test(username, testname)? {
+            return Err(ModelError::TestIsDone) 
+        }
+
+        let variant = self.generate_variant(testname)?;
+        self.create_test_record(username, testname, variant);
+        Ok(self.get_banner(testname)?)
+    }
+
+
+    /// Return [true] if user done the test.
+    fn is_user_done_test(&self, _username: &String, _test: &String) -> ModelResult<bool> {
+        // TODO check number_of_attempts
+        Ok(false) 
+    }
+
+
+    pub fn is_user_have_opened_variant(&self) -> ModelResult<bool> {
+        // TODO check user have opened variant
+        Ok(false)
     }
  
 
@@ -206,11 +224,7 @@ impl Model {
         Ok(res)
     }
 
-    /// Return [true] if user done the test.
-    fn is_user_done_test(&self, _username: &String, _test: &String) -> bool {
-        // TODO is user done test (all attempts)
-        false 
-    }
+
     
     /// TODO Add result collector: Automatically end tests with time is over
 
