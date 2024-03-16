@@ -189,8 +189,8 @@ fn send_request(request: &Request)
 
     let request = bincode::serialize(&request)?;
     let mut response = [0 as u8; 5000];
-    // TODO parse server address from env
-    let mut stream = TcpStream::connect("127.0.0.1:65001")?;
+    
+    let mut stream = TcpStream::connect(get_server_address())?;
     stream.write(&request)?;
     let n_bytes = stream.read(&mut response)?;
     
@@ -206,3 +206,11 @@ fn send_request(request: &Request)
     };
 }
 
+fn get_server_address() -> String {
+    match std::env::var("SERVER_ADDRESS") {
+        Ok(val) => {
+            val
+        }, 
+        Err(_) => "127.0.0.1:65001".to_string()
+    }
+}

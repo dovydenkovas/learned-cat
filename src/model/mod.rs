@@ -81,6 +81,9 @@ pub struct Model {
 
     #[serde(default)]
     result_path: String,
+    
+    #[serde(default)]
+    server_address: String, 
 
     #[serde(default)]
     #[serde(rename="test")]
@@ -95,6 +98,7 @@ impl std::default::Default for Model {
         Model { 
             tests_directory_path: "tests".to_string(),
             result_path: "results".to_string(),
+            server_address: "127.0.0.1:65001".to_string(),
             tests: vec![],
             results:  std::collections::hash_map::HashMap::new()
         }
@@ -125,6 +129,9 @@ impl Model {
         settings
     }
 
+    pub fn get_server_address(&self) -> String {
+        self.server_address.clone()
+    }
 
     pub fn get_banner(&self, testname: &String) -> String {
         let id = self.get_test_id_by_name(testname);
