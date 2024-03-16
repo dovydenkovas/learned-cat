@@ -8,7 +8,9 @@ pub enum ModelError {
     ResultNotExist(String),
     UserNotAllowed,
     VariantNotExist(String),
+    TestIsOpened(String), // TODO Прокинуть это событие на клиента 
 }
+
 
 impl std::fmt::Display for ModelError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -18,6 +20,8 @@ impl std::fmt::Display for ModelError {
             ModelError::ResultNotExist(result) => format!("Результата '{result}' не существует"),
             ModelError::UserNotAllowed => "Пользователь не имеет доступа к операции".to_string(),
             ModelError::VariantNotExist(variant) => format!("Варианта '{variant}' не существует"),
+            ModelError::TestIsOpened(testname) => format!("Тест '{testname}' уже выполняется"),
+
         };
         write!(f, "{res}")
     }
