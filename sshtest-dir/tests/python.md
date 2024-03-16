@@ -1,4 +1,3 @@
-# python
 qwewqe
 
 ## Что возвращает функция enumerate?
