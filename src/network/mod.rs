@@ -40,7 +40,7 @@ pub struct Request {
 }
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Command {
     GetAvaliableTests,
     StartTest, 

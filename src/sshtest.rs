@@ -43,8 +43,6 @@ fn main() {
 
 /// Обслуживает процесс тестирования.
 fn start_test(test_name: String) {
-    println!("Ищу тест: {test_name}");
-    
     let request = Request {
         user: whoami::username(),
         test: test_name.clone(),
