@@ -7,20 +7,17 @@ use crate::model::{Test, Question};
 
 
 enum ParseState {
-    QuestCaption,
-    QuestBanner,
+    TestBanner,
     ReadQuestion,
     ReadAnswer,
 }
 
 
 /// Парсит Markdown файл тестирования
-/// TODO read banner with *** 
 pub fn read_test(path: &Path, test: &mut Test) {
     let file = File::open(path).expect(format!("Не могу открыть файл теста: {:?}", path).as_str());
     let file = BufReader::new(file);
       
-    let mut name = String::new();
     let mut banner = String::new();
     let mut questions: Vec<Question> = vec![];
     let mut answer_number: usize = 0;
@@ -31,26 +28,13 @@ pub fn read_test(path: &Path, test: &mut Test) {
         correct_answers: vec![] 
     };
 
-    let mut state = ParseState::QuestCaption;
+    let mut state = ParseState::TestBanner;
     
     for line in file.lines() {
         let line = line.unwrap().trim().to_string();
         
         match state {
-            ParseState::QuestCaption => {
-                if line.starts_with("#") {
-                    name = line
-                    .to_string()
-                    .split("#")
-                    .last()
-                    .unwrap()
-                    .trim()
-                    .to_string();
-                    state = ParseState::QuestBanner;   
-                }
-            }
-            
-            ParseState::QuestBanner => {
+            ParseState::TestBanner => {
                 if line.starts_with("#") {
                     state = ParseState::ReadQuestion;
                 } else {
@@ -118,9 +102,6 @@ pub fn read_test(path: &Path, test: &mut Test) {
         questions.push(question);
     }
 
-    if name.len() > 0 {
-        test.caption = name;
-    }
     test.banner = banner;
     test.questions = questions;
 }
