@@ -9,7 +9,7 @@ clap = { version = "^4.5.2", features = ["derive"] }
 whoami = "^1.4.0"
 serde = { version = "^1.0.197", features = ["derive"] }
 bincode = "^1.3.3"
-chrono = "^0.4.35"
+chrono = {version="^0.4.35", features = ["serde"]}
 toml = "^0.8.10"
 rand = "0.8.5"
 
