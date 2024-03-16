@@ -11,8 +11,9 @@ use serde::Deserialize;
 
 pub mod parsetest;
 pub mod init;
+pub mod errors;
 use parsetest::read_test;
-
+use errors::{ModelResult, ModelError};
 
 
 #[derive(Debug, Deserialize, Clone)]
@@ -70,7 +71,7 @@ struct Variant {
     questions: Vec<Question>,
     answers: Vec<Vec<u8>>,
     current_question: usize,
-    result: usize, 
+    result: Option<usize>, 
 }
 
 
@@ -133,38 +134,37 @@ impl Model {
         self.server_address.clone()
     }
 
-    pub fn get_banner(&self, testname: &String) -> String {
-        let id = self.get_test_id_by_name(testname);
-        self.tests[id].banner.clone()
+    pub fn get_banner(&self, testname: &String) -> ModelResult<String> {
+        let id = self.get_test_id_by_name(testname)?;
+        Ok(self.tests[id].banner.clone())
     }
 
 
-    pub fn is_allowed_user(&self, username: &String, testname: &String) -> bool {
-        let id = self.get_test_id_by_name(testname); 
+    pub fn is_allowed_user(&self, username: &String, testname: &String) -> ModelResult<bool> {
+        let id = self.get_test_id_by_name(testname)?; 
         let test = &self.tests[id]; 
-        test.allowed_users.contains(username)
+        Ok(test.allowed_users.contains(username))
     }
   
 
-    pub fn start_test(&mut self, username: &String, test: &String) -> Result<String, ()> {
+    pub fn start_test(&mut self, username: &String, test: &String) -> ModelResult<String> {
         // auth
         if self.is_user_done_test(username, test) {
-            return Err(()); 
+            return Err(ModelError::UserNotAllowed); 
         }
 
         // TODO check number_of_attempts 
         // TODO generate questions
-        let variant = self.generate_variant(&test);
+        let variant = self.generate_variant(&test)?;
         self.create_test_record(username, test, variant);
-        //self.get_next_question(&username, &test, None)
-        Ok(self.get_banner(test))
+        Ok(self.get_banner(test)?)
     }
  
 
-    fn generate_variant(&self, testname: &String) -> Variant {
+    fn generate_variant(&self, testname: &String) -> ModelResult<Variant> {
         // TODO select n questions 
         // TODO shuffle 
-        let id = self.get_test_id_by_name(testname); 
+        let id = self.get_test_id_by_name(testname)?; 
         let test = &self.tests[id];
         
         let mut questions: Vec<Question> = vec![];
@@ -172,17 +172,18 @@ impl Model {
             questions.push(test.questions[i].clone()); 
         }
 
-        Variant {questions, answers: vec![], current_question: 0, result: 0 }
+        Ok(Variant {questions, answers: vec![], current_question: 0, result: None })
     }
 
 
-    fn get_test_id_by_name(&self, testname: &String) -> usize {
+    fn get_test_id_by_name(&self, testname: &String) -> ModelResult<usize> {
         for i in 0..self.tests.len() {
             if &self.tests[i].caption == testname {
-                return i 
+                return Ok(i) 
             }
         }
-        0 // TODO err if test not exist 
+
+        Err(ModelError::TestNotExist(testname.clone()))
     }
 
 
@@ -191,14 +192,18 @@ impl Model {
     }
 
 
-    pub fn get_avaliable_tests(&self, username: &String) -> Vec<(String, String)> {
+    pub fn get_avaliable_tests(&self, username: &String) -> ModelResult<Vec<(String, String)>> {
         let mut res: Vec<(String, String)> = vec![];
         for test in &self.tests {
             if test.allowed_users.contains(username) {
-                res.push((test.caption.clone(), self.get_result(username, &test))) 
+                let result = match self.get_result(username, &test) {
+                    Ok(result) => result,
+                    Err(_) => "".to_string(),
+                };
+                res.push((test.caption.clone(), result)) 
             }
         }
-        res
+        Ok(res)
     }
 
     /// Return [true] if user done the test.
@@ -209,55 +214,61 @@ impl Model {
     
     /// TODO Add result collector: Automatically end tests with time is over
 
-    pub fn get_next_question(&self, username: &String, testname: &String) -> Question {
+    pub fn get_next_question(&self, username: &String, testname: &String) -> ModelResult<Question> {
         let result_mark = username.to_owned() + "@" + &testname;
         // TODO time of test not over
-        if self.results.contains_key(&result_mark) {
-            let id = self.results[&result_mark].current_question;
-            if self.results[&result_mark].result == 0 {
-                return self.results[&result_mark].questions[id].clone(); 
-            }
+        if !self.results.contains_key(&result_mark) {
+            return Err(ModelError::VariantNotExist(result_mark.clone()))
         }
-        
-        // TODO error if there are no next question
-        Question {question: "111".to_string(), answers: ["tt".to_string()].to_vec(), correct_answers: [0].to_vec()}
+
+        if self.results[&result_mark].result.is_some() {
+            return Err(ModelError::TestIsDone) 
+        }
+
+        let id = self.results[&result_mark].current_question;
+        return Ok(self.results[&result_mark].questions[id].clone()); 
     }
 
-    pub fn is_next_question(&self, username: &String, testname: &String) -> bool {
+    pub fn is_next_question(&self, username: &String, testname: &String) -> ModelResult<bool> {
         let result_mark = username.to_owned() + "@" + &testname;
         // TODO check time of test is over 
         if self.results.contains_key(&result_mark) {
-            self.results[&result_mark].current_question < self.results[&result_mark].questions.len()
+            Ok(self.results[&result_mark].current_question < self.results[&result_mark].questions.len())
         } else {
-           false 
+           Ok(false)
         }
     }
 
-    pub fn put_answer(&mut self, username: &String, testname: &String, answer: &Vec<u8>) {
+    pub fn put_answer(&mut self, username: &String, testname: &String, answer: &Vec<u8>) -> ModelResult<()> {
         let result_mark = username.to_owned() + "@" + &testname;
         // TODO check test not done 
         if self.results.contains_key(&result_mark) {
             self.results.get_mut(&result_mark).unwrap().answers.push(answer.clone()); 
             self.results.get_mut(&result_mark).unwrap().current_question += 1;
+            return Ok(())
         }
+        Err(ModelError::VariantNotExist(result_mark.clone()))
     }
 
 
-    fn get_result(&self, username: &String, test: &Test) -> String {
+    fn get_result(&self, username: &String, test: &Test) -> ModelResult<String> {
         let result_mark = username.to_owned() + "@" + &test.caption;
         if self.results.contains_key(&result_mark) {
-            self.results[&result_mark].result.to_string()
+            match self.results[&result_mark].result {
+                Some(result) => Ok(result.to_string()),
+                None => Err(ModelError::ResultNotExist(result_mark.clone()))
+            }
+            
         } else {
-            "".to_string() // TODO error if there are not results 
+            Err(ModelError::VariantNotExist(result_mark.clone()))
         }
     }
 
 
-    pub fn get_result_by_testname(&self, username: &String, testname: &String) -> String {
-        let id = self.get_test_id_by_name(testname); 
+    pub fn get_result_by_testname(&self, username: &String, testname: &String) -> ModelResult<String> {
+        let id = self.get_test_id_by_name(testname)?; 
         let test = &self.tests[id]; 
-        self.get_result(username, test)
-        // TODO Error is test not done 
+        Ok(self.get_result(username, test)?)
     }
 }
 
