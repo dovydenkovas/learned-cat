@@ -37,8 +37,8 @@ pub struct Test {
     pub questions: Vec<Question>,
 
     pub questions_number: usize,
-    pub test_duration_minutes: u16,
-    pub number_of_attempts: u16,
+    pub test_duration_minutes: i64,
+    pub number_of_attempts: usize,
 
     /// Castumization 
     pub show_results: bool,
@@ -169,8 +169,15 @@ impl Model {
 
 
     /// Return [true] if user done the test.
-    fn is_user_done_test(&self, username: &String, test: &String) -> ModelResult<bool> {
-        // TODO check number_of_attempts
+    fn is_user_done_test(&self, username: &String, testname: &String) -> ModelResult<bool> {
+        let result_mark = username.to_owned() + "@" + testname;
+        if self.results.contains_key(&result_mark) {
+            let id = self.get_test_id_by_name(testname)?;
+            let test = &self.tests[id];
+            if self.results.get(&result_mark).unwrap().len() >= test.number_of_attempts {
+                return Ok(true) 
+            }
+        }
         Ok(false) 
     }
 
@@ -241,11 +248,22 @@ impl Model {
     }
 
     
-    fn is_test_time_is_over(&self, username: &String, testname: &String) -> bool {
-        // TODO time of test not over
-        return false;
+    fn is_test_time_is_over(&self, username: &String, testname: &String) -> ModelResult<bool> {
+        let result_mark = username.to_owned() + "@" + testname;
+        if self.results.contains_key(&result_mark) {
+            let id = self.get_test_id_by_name(testname)?;
+            let test = &self.tests[id];
+            let variant = & self.results.get(&result_mark).unwrap().last().unwrap();
+
+            if (chrono::Local::now() - variant.timestamp) > 
+                chrono::Duration::new(test.test_duration_minutes * 60, 0).unwrap() {
+                return Ok(true) 
+            }
+        }
+        return Ok(false);
     }
-    
+   
+
     pub fn get_next_question(&mut self, username: &String, testname: &String) -> ModelResult<Question> {
         let result_mark = username.to_owned() + "@" + &testname;    
         
@@ -257,7 +275,7 @@ impl Model {
             return Err(ModelError::TestIsDone) 
         }
         
-        if self.is_test_time_is_over(username, testname) {
+        if self.is_test_time_is_over(username, testname)? {
             self.done_test(username, testname);
             return Err(ModelError::TestIsDone)
         }
