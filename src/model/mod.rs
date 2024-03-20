@@ -1,8 +1,9 @@
 /// Содержит структуры тестов
-use std::io::Read;
+use std::io::{Read, Write};
 use std::fs::File;
 use std::error::Error;
 use std::path::Path;
+
 
 use toml::from_str as from_toml;
 use serde::{Deserialize, Serialize};
@@ -75,7 +76,14 @@ struct Variant {
     result: Option<usize>, 
 }
 
-type TestResults = std::collections::hash_map::HashMap<String, Vec<Variant>>;
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Variants {
+    variants: Vec<Variant>
+}
+
+type TestResults = std::collections::hash_map::HashMap<String, Variants>;
+
 
 #[derive(Deserialize, Debug)]
 pub struct Model {
@@ -109,7 +117,6 @@ impl std::default::Default for Model {
 }
 
 
-// TODO save result on test done 
 impl Model {
     pub fn new() -> Model {
         println!("* Чтение файла конфигурации ");
@@ -174,7 +181,7 @@ impl Model {
         if self.results.contains_key(&result_mark) {
             let id = self.get_test_id_by_name(testname)?;
             let test = &self.tests[id];
-            if self.results.get(&result_mark).unwrap().len() >= test.number_of_attempts {
+            if self.results.get(&result_mark).unwrap().variants.len() >= test.number_of_attempts {
                 return Ok(true) 
             }
         }
@@ -185,7 +192,7 @@ impl Model {
     pub fn is_user_have_opened_variant(&self, username: &String, testname: &String) -> ModelResult<bool> {
         let result_mark = username.to_owned() + "@" + testname;
         if self.results.contains_key(&result_mark) {
-            let variant = &self.results.get(&result_mark).unwrap().last().unwrap();
+            let variant = &self.results.get(&result_mark).unwrap().variants.last().unwrap();
             return Ok(variant.result.is_some());
         }
         Ok(false)
@@ -227,9 +234,9 @@ impl Model {
     fn create_test_record(&mut self, username: &String, testname: &String, variant: Variant) {
         let result_mark = username.to_owned() + "@" + testname;
         if !self.results.contains_key(&result_mark) {
-            self.results.insert(result_mark.clone(), vec![]);
+            self.results.insert(result_mark.clone(), Variants {  variants: vec![] });
         }
-        self.results.get_mut(&result_mark).unwrap().push(variant); 
+        self.results.get_mut(&result_mark).unwrap().variants.push(variant); 
     }
 
 
@@ -253,7 +260,7 @@ impl Model {
         if self.results.contains_key(&result_mark) {
             let id = self.get_test_id_by_name(testname)?;
             let test = &self.tests[id];
-            let variant = & self.results.get(&result_mark).unwrap().last().unwrap();
+            let variant = & self.results.get(&result_mark).unwrap().variants.last().unwrap();
 
             if (chrono::Local::now() - variant.timestamp) > 
                 chrono::Duration::new(test.test_duration_minutes * 60, 0).unwrap() {
@@ -271,7 +278,7 @@ impl Model {
             return Err(ModelError::VariantNotExist(result_mark.clone()))
         }
 
-        if self.results[&result_mark].last().unwrap().result.is_some() {
+        if self.results[&result_mark].variants.last().unwrap().result.is_some() {
             return Err(ModelError::TestIsDone) 
         }
         
@@ -280,15 +287,15 @@ impl Model {
             return Err(ModelError::TestIsDone)
         }
 
-        let id = self.results[&result_mark].last().unwrap().current_question;
-        return Ok(self.results[&result_mark].last().unwrap().questions[id].clone()); 
+        let id = self.results[&result_mark].variants.last().unwrap().current_question;
+        return Ok(self.results[&result_mark].variants.last().unwrap().questions[id].clone()); 
     }
 
     pub fn is_next_question(&self, username: &String, testname: &String) -> ModelResult<bool> {
         let result_mark = username.to_owned() + "@" + &testname;
         if self.results.contains_key(&result_mark) {
-            Ok(self.results[&result_mark].last().unwrap().current_question 
-               < self.results[&result_mark].last().unwrap().questions.len())
+            Ok(self.results[&result_mark].variants.last().unwrap().current_question 
+               < self.results[&result_mark].variants.last().unwrap().questions.len())
         } else {
            Ok(false)
         }
@@ -297,10 +304,13 @@ impl Model {
     pub fn put_answer(&mut self, username: &String, testname: &String, answer: &Vec<u8>) -> ModelResult<()> {
         let result_mark = username.to_owned() + "@" + &testname;
         if self.results.contains_key(&result_mark) {
-            let variant = &mut self.results.get_mut(&result_mark).unwrap().last_mut().unwrap();
+            let variant = &mut self.results.get_mut(&result_mark).unwrap().variants.last_mut().unwrap();
             if variant.result.is_none() {
                 variant.answers.push(answer.clone()); 
                 variant.current_question += 1;
+                if variant.current_question == variant.questions.len() {
+                    self.done_test(username, testname)
+                }
                 return Ok(())
             } 
             return Err(ModelError::TestIsDone);
@@ -312,7 +322,7 @@ impl Model {
     fn get_result(&self, username: &String, test: &Test) -> ModelResult<String> {
         let result_mark = username.to_owned() + "@" + &test.caption;
         if self.results.contains_key(&result_mark) {
-            match self.results[&result_mark].last().unwrap().result {
+            match self.results[&result_mark].variants.last().unwrap().result {
                 Some(result) => Ok(result.to_string()),
                 None => Err(ModelError::ResultNotExist(result_mark.clone()))
             }
@@ -335,7 +345,32 @@ impl Model {
     }
 
     fn done_test(&mut self, username: &String, testname: &String) {
-        // TODO done test and calculate mark 
+        self.calculate_mark(username, testname); 
+        self.save_result(username, testname);
+    }
+
+    fn calculate_mark(&mut self, username: &String, testname: &String) {
+        // TODO
+        let result_mark = username.to_owned() + "@" + testname; 
+        if self.results.contains_key(&result_mark) {
+            let variant = &mut self.results.get_mut(&result_mark).unwrap().variants.last_mut().unwrap();
+            variant.result = Some(1);
+        }
+    }
+
+    fn save_result(&mut self, username: &String, testname: &String) {
+        let result_mark = username.to_owned() + "@" + testname; 
+        
+        let filename = self.result_path.to_owned() + "/" + &result_mark + ".toml";
+        println!("{filename}");
+        let mut ofile = File::create(filename).expect("Не могу открыть файл");
+        
+        let result = &self.results[&result_mark];
+        println!("{:?}", result);
+
+        let out = toml::to_string(&result).expect("Не могу экспортировать файлы");
+        println!("{out}");
+        let _ = ofile.write(out.as_bytes()); 
     }
 }
 
