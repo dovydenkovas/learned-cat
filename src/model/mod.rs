@@ -8,6 +8,7 @@ use std::path::Path;
 use toml::from_str as from_toml;
 use serde::{Deserialize, Serialize};
 use rand::seq::SliceRandom;
+use walkdir::WalkDir;
 
 
 pub mod parsetest;
@@ -65,21 +66,21 @@ impl std::default::Default for Test {
 
 
 
-#[derive(Debug, Deserialize, Serialize)]
-struct Variant {
-    username: String,
-    testname: String,
-    timestamp: chrono::DateTime<chrono::Local>,
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Variant {
+    pub username: String,
+    pub testname: String,
+    pub timestamp: chrono::DateTime<chrono::Local>,
     questions: Vec<Question>,
-    answers: Vec<Vec<u8>>,
+    answers: Vec<Vec<usize>>,
     current_question: usize,
-    result: Option<usize>, 
+    pub result: Option<usize>, 
 }
 
 
-#[derive(Debug, Deserialize, Serialize)]
-struct Variants {
-    variants: Vec<Variant>
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Variants {
+    pub variants: Vec<Variant>
 }
 
 type TestResults = std::collections::hash_map::HashMap<String, Variants>;
@@ -161,12 +162,12 @@ impl Model {
             return Err(ModelError::UserNotAllowed)
         }
         
-        if self.is_user_have_opened_variant(username, testname)? {
-            return Err(ModelError::TestIsOpened(testname.clone()))
-        }
-
         if self.is_user_done_test(username, testname)? {
             return Err(ModelError::TestIsDone) 
+        }
+
+        if self.is_user_have_opened_variant(username, testname)? {
+            return Ok(self.get_banner(testname)?)
         }
 
         let variant = self.generate_variant(username, testname)?;
@@ -193,7 +194,7 @@ impl Model {
         let result_mark = username.to_owned() + "@" + testname;
         if self.results.contains_key(&result_mark) {
             let variant = &self.results.get(&result_mark).unwrap().variants.last().unwrap();
-            return Ok(variant.result.is_some());
+            return Ok(!variant.result.is_some());
         }
         Ok(false)
     }
@@ -301,7 +302,7 @@ impl Model {
         }
     }
 
-    pub fn put_answer(&mut self, username: &String, testname: &String, answer: &Vec<u8>) -> ModelResult<()> {
+    pub fn put_answer(&mut self, username: &String, testname: &String, answer: &Vec<usize>) -> ModelResult<()> {
         let result_mark = username.to_owned() + "@" + &testname;
         if self.results.contains_key(&result_mark) {
             let variant = &mut self.results.get_mut(&result_mark).unwrap().variants.last_mut().unwrap();
@@ -339,10 +340,10 @@ impl Model {
         Ok(self.get_result(username, test)?)
     }
 
-    pub fn collect_done_tests(&mut self) {
+    /*pub fn collect_done_tests(&mut self) {
         // TODO Add result collector: Automatically end tests with time is over
         println!("Starting collector of done tests");
-    }
+    }*/
 
     fn done_test(&mut self, username: &String, testname: &String) {
         self.calculate_mark(username, testname); 
@@ -354,7 +355,14 @@ impl Model {
         let result_mark = username.to_owned() + "@" + testname; 
         if self.results.contains_key(&result_mark) {
             let variant = &mut self.results.get_mut(&result_mark).unwrap().variants.last_mut().unwrap();
-            variant.result = Some(1);
+            let mut result = 0;
+            for i in 0..variant.questions.len()  {
+                variant.answers[i].sort();
+                if variant.questions[i].correct_answers == variant.answers[i] {
+                    result += 1;
+                }
+            }
+            variant.result = Some(result);
         }
     }
 
@@ -372,6 +380,10 @@ impl Model {
         println!("{out}");
         let _ = ofile.write(out.as_bytes()); 
     }
+
+    pub fn get_results(&self) -> TestResults {
+        self.results.clone()
+    }
 }
 
 
@@ -383,9 +395,34 @@ fn read_settings() -> Result<Model, Box<dyn Error>> {
 }
 
 
-/// TODO load results
 fn load_results(result_path: &String) -> TestResults {
-    std::collections::hash_map::HashMap::new()
+    println!("* Чтение результатов:");
+    let _ = std::fs::create_dir(result_path);
+   
+    let mut results = std::collections::hash_map::HashMap::new();
+
+    for entry in WalkDir::new(result_path).into_iter().filter_map(|e| e.ok()) {
+        if entry.path().is_file() {
+            println!("   * {}", entry.path().display());
+            match load_results_from_file(entry.path()) {
+                Ok(result) => {
+                    let key = entry.path().file_stem().unwrap().to_str().unwrap().to_string();
+                    results.insert(key, result);
+                },
+                Err(e) => println!("{e}")
+            }
+        }
+    }
+
+    results 
+}
+
+
+fn load_results_from_file(result_filename: &Path) -> Result<Variants, Box<dyn Error>> {
+    let mut file = File::open(result_filename)?;
+    let mut results_string = String::new();
+    file.read_to_string(&mut results_string)?;
+    Ok(from_toml(&results_string)?)  
 }
 
 

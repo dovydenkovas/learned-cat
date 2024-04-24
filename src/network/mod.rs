@@ -45,7 +45,7 @@ pub enum Command {
     GetAvaliableTests,
     StartTest, 
     GetNextQuestion,
-    PutAnswer { answer: Vec<u8> },
+    PutAnswer { answer: Vec<usize> },
 }
 
 

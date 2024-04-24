@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use crate::network::{Request, Response, Command};
 use crate::model::Model;
 use crate::model::errors::{ModelResult, ModelError};
@@ -41,21 +43,16 @@ impl Presenter {
                     Err(ModelError::TestIsDone) => Response::End { 
                         result: self.model.get_result_by_testname(&request.user, &request.test)? 
                     },
+                    /*Err(ModelError::TestIsOpened(_)) => {
+                        self.get_next_question(&request.user, &request.test)? 
+                    },*/
                     Err(err) => return Err(err),
                 }
             },
 
  
             Command::GetNextQuestion => {
-                if self.model.is_next_question(&request.user, &request.test)? {
-                    let question = self.model.get_next_question(&request.user, &request.test)?;
-                    Response::NextQuestion {
-                        question: question.question, 
-                        answers: question.answers,
-                    }
-                } else {
-                    Response::End { result: self.model.get_result_by_testname(&request.user, &request.test)? }
-                }
+                self.get_next_question(&request.user, &request.test)?
             },
 
             Command::PutAnswer { answer } => {
@@ -76,9 +73,36 @@ impl Presenter {
     
 
     pub fn export_results(&mut self, filename: String) {
-        //self.model.get_results();   
+        let results = self.model.get_results();
+        let mut file = std::fs::File::create(filename).expect("Не могу создать файл");
+        
+        for vars in results.values() {
+            for var in &vars.variants {
+                if var.result.is_some() {
+                let out = format!("{},{},{},{},{}\n", 
+                                  var.testname, 
+                                  var.username, 
+                                  var.timestamp.date_naive(), 
+                                  var.timestamp.time().format("%H:%M:%S"), 
+                                  var.result.unwrap());
 
-        println!("Созраняю в файл {filename}.");
-        // TODO: export results
+                println!("{}", out);
+                let _ = file.write(out.as_bytes());
+
+                }
+            }
+        }
+    }
+
+    fn get_next_question(&mut self, user: &String, test: &String) -> ModelResult<Response> {
+        if self.model.is_next_question(user, &test)? {
+            let question = self.model.get_next_question(&user, &test)?;
+            Ok(Response::NextQuestion {
+                question: question.question, 
+                answers: question.answers,
+            })
+        } else {
+            Ok(Response::End { result: self.model.get_result_by_testname(&user, &test)? })
+        }
     }
 }
