@@ -118,7 +118,7 @@ fn run_test(test_name: String) {
 }
 
 /// Задает вопрос 
-fn ask_question(question: String, answers: Vec<String>) -> Vec<u8> { 
+fn ask_question(question: String, answers: Vec<String>) -> Vec<usize> { 
     'ask: loop {
         println!("");
         println!(" *** ");
@@ -134,12 +134,12 @@ fn ask_question(question: String, answers: Vec<String>) -> Vec<u8> {
             continue 'ask;
         } 
 
-        let mut answer: Vec<u8> = answer
+        let mut answer: Vec<usize> = answer
             .replace(",", " ")
             .replace("  ", " ")
             .trim()
             .split(" ")
-            .map(|x| x.parse::<u8>().unwrap())
+            .map(|x| x.parse::<usize>().unwrap())
             .collect();
 
         for i in 0..answer.len() {
