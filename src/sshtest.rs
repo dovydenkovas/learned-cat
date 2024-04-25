@@ -2,12 +2,12 @@
 /// Отправляет запросы на сервер и предоставляет пользовательский интерфейс. 
 
 use std::error::Error;
-use std::io::stdin;
 use std::net::TcpStream;
 use std::io::prelude::*;
 
 use clap::Parser;
 use whoami;
+use rustyline::DefaultEditor;
 
 mod network;
 use network::{Response, Request, Command};
@@ -56,14 +56,10 @@ fn start_test(test_name: String) {
                 Response::TestStarted { banner } => {
                     println!("{banner}");
                     println!("Вы готовы начать тестирование? (Введите <да> или <нет>)");
-
-                    let mut s = String::new();
-                    let _ = stdin().read_line(&mut s);
-                    match s.trim().to_lowercase().as_str() {
-                        "yes" | "y" | "да" | "д" => run_test(test_name),
-                        _ => (),
+                    if ask_yes() {
+                        run_test(test_name);
                     }
-                },
+                                    },
                 
                 Response::End { result } => {
                     println!("Тест завершен. Ваш результат: {}", result);
@@ -76,6 +72,26 @@ fn start_test(test_name: String) {
     }
 }
 
+
+fn ask_yes() -> bool {
+    loop {
+        let mut rl = match DefaultEditor::new() {
+            Ok(v) => v,
+            _ => continue
+        };
+
+        let s = match rl.readline(">>> ") {
+            Ok(v) => v,
+            Err(rustyline::error::ReadlineError::Eof) => std::process::exit(0),
+            _ => continue
+        };
+        match s.trim().to_lowercase().as_str() {
+            "yes" | "y" | "да" | "д" => return true,
+            "no" | "n" | "нет" | "н" => return false,
+            _ => (),
+        }
+    }
+}
 
 fn run_test(test_name: String) {
     let next_question_request = Request {
@@ -119,33 +135,31 @@ fn run_test(test_name: String) {
 
 /// Задает вопрос 
 fn ask_question(question: String, answers: Vec<String>) -> Vec<usize> { 
+    println!("");
+    println!("{:>len$}", "***", len=question.len()/2-1);
+    println!("{question}");
+    for i in 0..answers.len() {
+        println!("{}) {}", i+1, answers[i]);
+    }
+
     'ask: loop {
-        println!("");
-        println!(" *** ");
-        println!("{question}");
-
-        for i in 0..answers.len() {
-            println!("{}) {}", i+1, answers[i]);
-        }
-
-        let mut answer = String::new();
-        if std::io::stdin().read_line(&mut answer).is_err() {
-            println!("Не понимаю ответ");
-            continue 'ask;
-        } 
-
+        let answer = ask_string();
         let mut answer: Vec<usize> = answer
             .replace(",", " ")
             .replace("  ", " ")
             .trim()
             .split(" ")
-            .map(|x| x.parse::<usize>().unwrap())
+            .map(|x| match x.parse::<usize>() {
+                Ok(v) => v,
+                _ => 100000000,
+                })
             .collect();
 
         for i in 0..answer.len() {
             if answer[i] as usize <= answers.len() && answer[i] > 0 {
                 answer[i] -= 1;
             } else {
+                println!("Пожалуйста, введите номера правильных ответов через пробел.");
                 continue 'ask;
             }
         }
@@ -154,7 +168,20 @@ fn ask_question(question: String, answers: Vec<String>) -> Vec<usize> {
     }
 }
 
+fn ask_string() -> String {
+    loop {
+        let mut rl = match DefaultEditor::new() {
+            Ok(v) => v,
+            _ => continue
+        };
 
+        match rl.readline(">>> ") {
+            Ok(v) => return v,
+            Err(rustyline::error::ReadlineError::Eof) => std::process::exit(0),
+            _ => continue
+        };
+    }
+}
 
 /// Выводит перечень тестов.
 fn print_avaliable_tests() { 
@@ -169,14 +196,26 @@ fn print_avaliable_tests() {
             match response {
                 Response::AvaliableTests { tests } => {
                     println!("Перечень доступных тестов:");
-                    for (test, result) in tests {
-                        println!("{test} {result}");
-                    }
-                },
+                    print_table(tests);
+                                    },
                 _ => eprintln!("Ошибка чтения списка тестов."),
             }
         },
         Err(err) => eprintln!("Ошибка связи с сервером: {}", err.to_string())
+    }
+}
+
+
+/// Вывод таблицы ключ-значение 
+fn print_table(values: Vec<(String, String)>) {
+    let mut max_first = 0;
+    for (first, _) in &values {
+        max_first = std::cmp::max(max_first, first.len());
+    }
+    
+    println!("{:>max_first$}   Ваш результат", "Тест");
+    for (first, second) in &values {
+        println!("{first:>max_first$}   {second:>6}");
     }
 }
 
