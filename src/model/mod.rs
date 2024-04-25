@@ -323,11 +323,23 @@ impl Model {
     fn get_result(&self, username: &String, test: &Test) -> ModelResult<String> {
         let result_mark = username.to_owned() + "@" + &test.caption;
         if self.results.contains_key(&result_mark) {
-            match self.results[&result_mark].variants.last().unwrap().result {
-                Some(result) => Ok(result.to_string()),
-                None => Err(ModelError::ResultNotExist(result_mark.clone()))
+            let mut result = 0;
+            let mut has_result = false;
+            for variant in &self.results[&result_mark].variants {
+                match variant.result {
+                    Some(res) => {
+                        result = std::cmp::max(result, res);
+                        has_result = true;
+                    },
+                    None => (),
+                }
             }
-            
+
+            if has_result {
+                Ok(result.to_string())
+            } else {
+                Err(ModelError::ResultNotExist(result_mark.clone()))
+            }
         } else {
             Err(ModelError::VariantNotExist(result_mark.clone()))
         }

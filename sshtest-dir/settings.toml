@@ -1,6 +1,6 @@
 tests_directory_path = "tests"
 result_path = "results"
-server_address = "127.0.0.1:65432"
+server_address = "127.0.0.1:65001"
 
 [[test]]
 caption="linux"
