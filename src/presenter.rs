@@ -1,5 +1,5 @@
 use crate::model::errors::{ModelError, ModelResult};
-use crate::model::Model;
+use crate::model::{Model, Settings};
 use crate::network::{Command, Request, Response};
 
 pub struct Presenter {
@@ -7,7 +7,7 @@ pub struct Presenter {
 }
 
 impl Presenter {
-    pub fn new(settings: Model) -> Presenter {
+    pub fn new(settings: Settings) -> Presenter {
         Presenter {
             model: Model::new(settings),
         }

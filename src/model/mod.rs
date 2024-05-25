@@ -1,9 +1,9 @@
 use std::env::set_current_dir;
 use std::error::Error;
 use std::fs::File;
-/// Содержит структуры тестов
 use std::io::{Read, Write};
 use std::path::Path;
+use std::collections::hash_map::HashMap;
 
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
@@ -78,55 +78,72 @@ pub struct Variants {
 
 type TestResults = std::collections::hash_map::HashMap<String, Variants>;
 
+// TODO Использовать эту структуру и потом переносить в поля модели
 #[derive(Deserialize, Debug)]
-pub struct Model {
+pub struct Settings {
     #[serde(default)]
-    tests_directory_path: String,
+    pub tests_directory_path: String,
 
     #[serde(default)]
     pub result_path: String,
 
     #[serde(default)]
-    server_address: String,
+    pub server_address: String,
 
     #[serde(default)]
     #[serde(rename = "test")]
-    tests: Vec<Test>,
-
-    #[serde(default)]
-    results: TestResults,
+    pub tests: Vec<Test>
 }
 
-impl std::default::Default for Model {
-    fn default() -> Model {
-        Model {
+
+
+impl std::default::Default for Settings {
+    fn default() -> Settings {
+        Settings {
             tests_directory_path: "tests".to_string(),
             result_path: "results".to_string(),
             server_address: "127.0.0.1:65001".to_string(),
             tests: vec![],
-            results: std::collections::hash_map::HashMap::new(),
         }
     }
 }
 
+
+#[derive(Deserialize, Debug)]
+pub struct Model {
+    result_path: String,
+    server_address: String,
+    tests: HashMap<String, Test>,
+    results: TestResults,
+}
+
+
 impl Model {
-    pub fn new(mut settings: Model) -> Model {
+    pub fn new(settings: Settings) -> Model {
         println!("* Чтение тестов: ");
         set_daemon_dir().expect("Error init and start server");
+        
         // Read tests
         let quests_base_path = Path::new(&settings.tests_directory_path);
-        for test in &mut settings.tests {
+        let mut tests: HashMap<String, Test> = HashMap::new();
+        for mut test in settings.tests {
             let path = quests_base_path.join(Path::new(&(test.caption.to_owned() + ".md")));
-            read_test(&path, test);
+            read_test(&path, &mut test);
+            tests.insert(test.caption.clone(), test);
         }
 
-        for test in &settings.tests {
-            println!("  * {}", test.caption);
+        for test in tests.keys() {
+            println!("  * {}", test);
         }
 
         let results = load_results(&settings.result_path);
-        settings.results = results;
-        settings
+        
+        Model {
+            server_address: settings.server_address,
+            result_path: settings.result_path,
+            tests,
+            results,
+        }
     }
 
     pub fn get_server_address(&self) -> String {
@@ -134,13 +151,13 @@ impl Model {
     }
 
     pub fn get_banner(&self, testname: &String) -> ModelResult<String> {
-        let id = self.get_test_id_by_name(testname)?;
-        Ok(self.tests[id].banner.clone())
+        Ok(self.tests.get(testname)
+            .unwrap_or(&Test::default())
+            .banner.clone())
     }
 
     pub fn is_allowed_user(&self, username: &String, testname: &String) -> ModelResult<bool> {
-        let id = self.get_test_id_by_name(testname)?;
-        let test = &self.tests[id];
+        let test = &self.tests.get(testname).ok_or(ModelError::TestNotExist(testname.to_string()))?;
         Ok(test.allowed_users.contains(username))
     }
 
@@ -166,8 +183,7 @@ impl Model {
     fn is_user_done_test(&self, username: &String, testname: &String) -> ModelResult<bool> {
         let result_mark = username.to_owned() + "@" + testname;
         if self.results.contains_key(&result_mark) {
-            let id = self.get_test_id_by_name(testname)?;
-            let test = &self.tests[id];
+            let test = &self.tests.get(testname).ok_or(ModelError::TestNotExist(testname.to_string()))?;
             if self.results.get(&result_mark).unwrap().variants.len() >= test.number_of_attempts {
                 return Ok(true);
             }
@@ -195,8 +211,7 @@ impl Model {
     }
 
     fn generate_variant(&self, username: &String, testname: &String) -> ModelResult<Variant> {
-        let id = self.get_test_id_by_name(testname)?;
-        let test = &self.tests[id];
+        let test = &self.tests.get(testname).ok_or(ModelError::TestNotExist(testname.to_string()))?;
 
         let questions: Vec<Question> = test
             .questions
@@ -215,16 +230,7 @@ impl Model {
         })
     }
 
-    fn get_test_id_by_name(&self, testname: &String) -> ModelResult<usize> {
-        for i in 0..self.tests.len() {
-            if &self.tests[i].caption == testname {
-                return Ok(i);
-            }
-        }
-
-        Err(ModelError::TestNotExist(testname.clone()))
-    }
-
+    
     fn create_test_record(&mut self, username: &String, testname: &String, variant: Variant) {
         let result_mark = username.to_owned() + "@" + testname;
         if !self.results.contains_key(&result_mark) {
@@ -240,7 +246,7 @@ impl Model {
 
     pub fn get_avaliable_tests(&self, username: &String) -> ModelResult<Vec<(String, String)>> {
         let mut res: Vec<(String, String)> = vec![];
-        for test in &self.tests {
+        for test in self.tests.values() {
             if test.allowed_users.contains(username) {
                 let result = match self.get_result(username, &test) {
                     Ok(result) => result,
@@ -255,8 +261,8 @@ impl Model {
     fn is_test_time_is_over(&self, username: &String, testname: &String) -> ModelResult<bool> {
         let result_mark = username.to_owned() + "@" + testname;
         if self.results.contains_key(&result_mark) {
-            let id = self.get_test_id_by_name(testname)?;
-            let test = &self.tests[id];
+            let test = &self.tests.get(testname)
+                .ok_or(ModelError::TestNotExist(testname.to_string()))?;
             let variant = &self
                 .results
                 .get(&result_mark)
@@ -390,8 +396,8 @@ impl Model {
         username: &String,
         testname: &String,
     ) -> ModelResult<String> {
-        let id = self.get_test_id_by_name(testname)?;
-        let test = &self.tests[id];
+        let test = &self.tests.get(testname)
+            .ok_or(ModelError::TestNotExist(testname.to_string()))?;
         Ok(self.get_result(username, test)?)
     }
 
@@ -447,7 +453,7 @@ impl Model {
     }*/
 }
 
-pub fn read_settings() -> Result<Model, Box<dyn Error>> {
+pub fn read_settings() -> Result<Settings, Box<dyn Error>> {
     let settings_path = get_daemon_dir_path() + "/settings.toml";
     let mut file = File::open(settings_path)?;
     let mut settings = String::new();
