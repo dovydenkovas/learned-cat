@@ -1,4 +1,4 @@
-use std::env::set_current_dir;
+use crate::model::Model;
 use std::error::Error;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -13,12 +13,13 @@ mod model;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = get_arguments();
-    set_daemon_dir()?;
+    let settings = model::read_settings()?;
 
     match arguments.subcommand() {
         Some(("init", _)) => model::init::init_server(),
-        Some(("start", _)) => start_server()?,
+        Some(("start", _)) => start_server(settings)?,
         Some(("export-results", args)) => export_results(
+            settings.result_path,
             args.get_one::<String>("filename")
                 .or(Some(&"output.csv".to_string()))
                 .unwrap()
@@ -30,26 +31,33 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn start_server() -> Result<(), Box<dyn Error>> {
-    let mut presenter: Presenter = Presenter::new();
+fn start_server(settings: Model) -> Result<(), Box<dyn Error>> {
+    let mut presenter: Presenter = Presenter::new(settings);
     server_mainloop(&mut presenter);
     Ok(())
 }
 
-fn export_results(filename: String) -> Result<(), Box<dyn Error>> {
-    //presenter.export_results(filename); // arguments.get_one::<String>("filename").unwrap().to_string());
-    todo!();
-}
+fn export_results(results_filename: String, output_filename: String) -> Result<(), Box<dyn Error>> {
+    let result_path = model::get_daemon_dir_path() + "/" + results_filename.as_str();
+    let results = model::load_results(&result_path);
+    let mut file = std::fs::File::create(output_filename).expect("Не могу создать файл");
 
-fn set_daemon_dir() -> Result<(), Box<dyn Error>> {
-    let root = std::path::Path::new("/home/asd/code/desktop/sshtest/sshtest-dir"); // TODO
-    if set_current_dir(&root).is_err() {
-        eprintln!(
-            "Ошибка доступа к каталогу сервера {}.",
-            root.to_str().unwrap()
-        );
-        eprintln!("Проверьте, что каталог существует, и у процесса есть у нему доступ.");
-        return Err(Box::new(std::fmt::Error));
+    for vars in results.values() {
+        for var in &vars.variants {
+            if var.result.is_some() {
+                let out = format!(
+                    "{},{},{},{},{}\n",
+                    var.testname,
+                    var.username,
+                    var.timestamp.date_naive(),
+                    var.timestamp.time().format("%H:%M:%S"),
+                    var.result.unwrap()
+                );
+
+                println!("{}", out);
+                let _ = file.write(out.as_bytes());
+            }
+        }
     }
     Ok(())
 }
@@ -73,7 +81,7 @@ fn get_arguments() -> clap::ArgMatches {
         .subcommand(
             clap::Command::new("export-results")
 
-            .about("экспортировать результаты тестирования в виде csv таблицы следующего формата: <student>;<test>;<date>;<result>")
+            .about("экспортировать результаты тестирования в виде csv таблицы следующего формата: <test>,<student>,<date>,<time>,<result>")
                 .arg(arg!([filename]).required(true)),
         )
 
