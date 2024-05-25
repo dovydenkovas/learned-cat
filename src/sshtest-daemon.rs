@@ -1,4 +1,4 @@
-use crate::model::Model;
+use crate::model::Settings;
 use std::error::Error;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn start_server(settings: Model) -> Result<(), Box<dyn Error>> {
+fn start_server(settings: Settings) -> Result<(), Box<dyn Error>> {
     let mut presenter: Presenter = Presenter::new(settings);
     server_mainloop(&mut presenter);
     Ok(())
