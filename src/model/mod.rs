@@ -4,6 +4,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
@@ -122,7 +123,7 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn new(settings: Settings) -> Model {
+    pub fn begin(settings: Settings) -> Arc<Mutex<Model>> {
         println!("* Чтение тестов: ");
         set_daemon_dir().expect("Error init and start server");
 
@@ -141,12 +142,17 @@ impl Model {
 
         let results = load_results(&settings.result_path);
 
-        Model {
+        let model = Arc::new(Mutex::new(Model {
             server_address: settings.server_address,
             result_path: settings.result_path,
             tests,
             results,
-        }
+        }));
+
+        let arc_model = Arc::clone(&model);
+        std::thread::spawn(|| test_collector(arc_model));
+
+        model
     }
 
     pub fn get_server_address(&self) -> String {
@@ -419,11 +425,6 @@ impl Model {
         Ok(self.get_result(username, test)?)
     }
 
-    /*pub fn collect_done_tests(&mut self) {
-        // TODO Add result collector: Automatically end tests with time is over
-        println!("Starting collector of done tests");
-    }*/
-
     fn done_test(&mut self, username: &String, testname: &String) {
         self.calculate_mark(username, testname);
         self.save_result(username, testname);
@@ -441,7 +442,7 @@ impl Model {
                 .last_mut()
                 .unwrap();
             let mut result = 0;
-            for i in 0..variant.questions.len() {
+            for i in 0..variant.answers.len() {
                 variant.answers[i].sort();
                 if variant.questions[i].correct_answers == variant.answers[i] {
                     result += 1;
@@ -465,10 +466,6 @@ impl Model {
         println!("{out}");
         let _ = ofile.write(out.as_bytes());
     }
-
-    /*pub fn get_results(&self) -> TestResults {
-        self.results.clone()
-    }*/
 }
 
 pub fn read_settings() -> Result<Settings, Box<dyn Error>> {
@@ -505,6 +502,34 @@ pub fn load_results(result_path: &String) -> TestResults {
     }
 
     results
+}
+
+fn test_collector(model: Arc<Mutex<Model>>) {
+    loop {
+        {
+            println!("---");
+            let mut done_tests: Vec<(String, String)> = vec![];
+            {
+                let model = model.lock().unwrap();
+                for result in model.results.values().by_ref() {
+                    if result.variants.len() > 0 {
+                        let username = &result.variants.last().unwrap().username;
+                        let testname = &result.variants.last().unwrap().testname;
+                        let res = model.is_test_time_is_over(username, &testname);
+                        if res.is_ok() && res.unwrap() {
+                            println!("{username}, {testname}");
+                            done_tests.push((username.clone(), testname.clone()));
+                        }
+                    }
+                }
+            }
+
+            for (username, testname) in done_tests {
+                model.lock().unwrap().done_test(&username, &testname);
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_secs(3));
+    }
 }
 
 fn load_results_from_file(result_filename: &Path) -> Result<Variants, Box<dyn Error>> {
