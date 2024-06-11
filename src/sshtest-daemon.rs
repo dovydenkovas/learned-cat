@@ -95,7 +95,7 @@ fn get_arguments() -> clap::ArgMatches {
 
 /// Open listener and run mainloop
 fn server_mainloop(presenter: &mut Presenter) {
-    let address = presenter.model.get_server_address();
+    let address = presenter.model.lock().unwrap().get_server_address();
     println!("* Открываю порт сервера: {}", address);
     let listener = TcpListener::bind(address).expect("Не могу открыть соединение");
 
