@@ -1,9 +1,9 @@
+use std::collections::hash_map::HashMap;
 use std::env::set_current_dir;
 use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
-use std::collections::hash_map::HashMap;
 
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
@@ -35,13 +35,20 @@ pub struct Test {
     #[serde(default)]
     pub questions: Vec<Question>,
 
+    #[serde(default)]
     pub questions_number: usize,
+
+    #[serde(default)]
     pub test_duration_minutes: i64,
+
+    #[serde(default)]
     pub number_of_attempts: usize,
 
     /// Castumization
+    #[serde(default)]
     pub show_results: bool,
 
+    #[serde(default)]
     pub allowed_users: Vec<String>,
 }
 
@@ -92,10 +99,8 @@ pub struct Settings {
 
     #[serde(default)]
     #[serde(rename = "test")]
-    pub tests: Vec<Test>
+    pub tests: Vec<Test>,
 }
-
-
 
 impl std::default::Default for Settings {
     fn default() -> Settings {
@@ -108,7 +113,6 @@ impl std::default::Default for Settings {
     }
 }
 
-
 #[derive(Deserialize, Debug)]
 pub struct Model {
     result_path: String,
@@ -117,12 +121,11 @@ pub struct Model {
     results: TestResults,
 }
 
-
 impl Model {
     pub fn new(settings: Settings) -> Model {
         println!("* Чтение тестов: ");
         set_daemon_dir().expect("Error init and start server");
-        
+
         // Read tests
         let quests_base_path = Path::new(&settings.tests_directory_path);
         let mut tests: HashMap<String, Test> = HashMap::new();
@@ -137,7 +140,7 @@ impl Model {
         }
 
         let results = load_results(&settings.result_path);
-        
+
         Model {
             server_address: settings.server_address,
             result_path: settings.result_path,
@@ -151,13 +154,19 @@ impl Model {
     }
 
     pub fn get_banner(&self, testname: &String) -> ModelResult<String> {
-        Ok(self.tests.get(testname)
+        Ok(self
+            .tests
+            .get(testname)
             .unwrap_or(&Test::default())
-            .banner.clone())
+            .banner
+            .clone())
     }
 
     pub fn is_allowed_user(&self, username: &String, testname: &String) -> ModelResult<bool> {
-        let test = &self.tests.get(testname).ok_or(ModelError::TestNotExist(testname.to_string()))?;
+        let test = &self
+            .tests
+            .get(testname)
+            .ok_or(ModelError::TestNotExist(testname.to_string()))?;
         Ok(test.allowed_users.contains(username))
     }
 
@@ -183,7 +192,10 @@ impl Model {
     fn is_user_done_test(&self, username: &String, testname: &String) -> ModelResult<bool> {
         let result_mark = username.to_owned() + "@" + testname;
         if self.results.contains_key(&result_mark) {
-            let test = &self.tests.get(testname).ok_or(ModelError::TestNotExist(testname.to_string()))?;
+            let test = &self
+                .tests
+                .get(testname)
+                .ok_or(ModelError::TestNotExist(testname.to_string()))?;
             if self.results.get(&result_mark).unwrap().variants.len() >= test.number_of_attempts {
                 return Ok(true);
             }
@@ -211,7 +223,10 @@ impl Model {
     }
 
     fn generate_variant(&self, username: &String, testname: &String) -> ModelResult<Variant> {
-        let test = &self.tests.get(testname).ok_or(ModelError::TestNotExist(testname.to_string()))?;
+        let test = &self
+            .tests
+            .get(testname)
+            .ok_or(ModelError::TestNotExist(testname.to_string()))?;
 
         let questions: Vec<Question> = test
             .questions
@@ -230,7 +245,6 @@ impl Model {
         })
     }
 
-    
     fn create_test_record(&mut self, username: &String, testname: &String, variant: Variant) {
         let result_mark = username.to_owned() + "@" + testname;
         if !self.results.contains_key(&result_mark) {
@@ -261,7 +275,9 @@ impl Model {
     fn is_test_time_is_over(&self, username: &String, testname: &String) -> ModelResult<bool> {
         let result_mark = username.to_owned() + "@" + testname;
         if self.results.contains_key(&result_mark) {
-            let test = &self.tests.get(testname)
+            let test = &self
+                .tests
+                .get(testname)
                 .ok_or(ModelError::TestNotExist(testname.to_string()))?;
             let variant = &self
                 .results
@@ -396,7 +412,9 @@ impl Model {
         username: &String,
         testname: &String,
     ) -> ModelResult<String> {
-        let test = &self.tests.get(testname)
+        let test = &self
+            .tests
+            .get(testname)
             .ok_or(ModelError::TestNotExist(testname.to_string()))?;
         Ok(self.get_result(username, test)?)
     }
@@ -511,5 +529,5 @@ fn set_daemon_dir() -> Result<(), Box<dyn Error>> {
 }
 
 pub fn get_daemon_dir_path() -> String {
-    "/home/asd/code/desktop/sshtest/sshtest-dir".to_string()
+    "/opt/sshtest".to_string()
 }

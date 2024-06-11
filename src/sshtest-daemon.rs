@@ -13,18 +13,23 @@ mod model;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = get_arguments();
-    let settings = model::read_settings()?;
 
     match arguments.subcommand() {
         Some(("init", _)) => model::init::init_server(),
-        Some(("start", _)) => start_server(settings)?,
-        Some(("export-results", args)) => export_results(
+        Some(("start", _)) => {
+            let settings = model::read_settings()?;
+            start_server(settings)?
+        },
+        Some(("export-results", args)) => {
+            let settings = model::read_settings()?;
+            export_results(
             settings.result_path,
             args.get_one::<String>("filename")
                 .or(Some(&"output.csv".to_string()))
                 .unwrap()
                 .to_string(),
-        )?,
+        )?
+        },
         Some((&_, _)) => eprintln!("Неизвестная команда."),
         None => eprintln!("Необходимо указать команду. Для просмотра доступных кооманд используйте переметр --help"),
     };
