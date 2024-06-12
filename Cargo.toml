@@ -9,8 +9,8 @@ clap = { version = "^4.5.2", features = ["derive"] }
 whoami = "^1.4.0"
 serde = { version = "^1.0.197", features = ["derive"] }
 bincode = "^1.3.3"
-chrono = {version="^0.4.35", features = ["serde"]}
-toml = {version="^0.8.10", features=["display"]}
+chrono = { version = "^0.4.35", features = ["serde"] }
+toml = { version = "^0.8.10", features = ["display"] }
 rand = "0.8.5"
 walkdir = "2.5.0"
 rustyline = "14.0.0"
@@ -23,5 +23,3 @@ path = "src/sshtest-daemon.rs"
 [[bin]]
 name = "sshtest"
 path = "src/sshtest.rs"
-
-

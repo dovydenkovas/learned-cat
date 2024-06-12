@@ -72,7 +72,7 @@ impl std::default::Default for Test {
 pub struct Variant {
     pub username: String,
     pub testname: String,
-    pub timestamp: chrono::DateTime<chrono::Local>,
+    pub timestamp: Option<chrono::DateTime<chrono::Local>>,
     questions: Vec<Question>,
     answers: Vec<Vec<usize>>,
     current_question: usize,
@@ -243,7 +243,7 @@ impl Model {
         Ok(Variant {
             username: username.clone(),
             testname: testname.clone(),
-            timestamp: chrono::offset::Local::now(),
+            timestamp: None,
             questions,
             answers: vec![],
             current_question: 0,
@@ -293,7 +293,11 @@ impl Model {
                 .last()
                 .unwrap();
 
-            if (chrono::Local::now() - variant.timestamp)
+            if variant.timestamp.is_none() {
+                return Ok(false);
+            }
+
+            if (chrono::Local::now() - variant.timestamp.unwrap())
                 > chrono::Duration::new(test.test_duration_minutes * 60, 0).unwrap()
             {
                 return Ok(true);
@@ -328,17 +332,19 @@ impl Model {
             return Err(ModelError::TestIsDone);
         }
 
-        let id = self.results[&result_mark]
-            .variants
-            .last()
+        let variant = self
+            .results
+            .get_mut(&result_mark)
             .unwrap()
-            .current_question;
-        return Ok(self.results[&result_mark]
             .variants
-            .last()
-            .unwrap()
-            .questions[id]
-            .clone());
+            .last_mut()
+            .unwrap();
+        if variant.timestamp.is_none() {
+            variant.timestamp = Some(chrono::offset::Local::now());
+        }
+
+        let id = variant.current_question;
+        return Ok(variant.questions[id].clone());
     }
 
     pub fn is_next_question(&self, username: &String, testname: &String) -> ModelResult<bool> {
@@ -456,15 +462,14 @@ impl Model {
         let result_mark = username.to_owned() + "@" + testname;
 
         let filename = self.result_path.to_owned() + "/" + &result_mark + ".toml";
-        println!("{filename}");
-        let mut ofile = File::create(filename).expect("Не могу открыть файл");
+        let mut ofile = File::create(filename).expect("Не могу открыть файл результата");
 
         let result = &self.results[&result_mark];
-        println!("{:?}", result);
 
-        let out = toml::to_string(&result).expect("Не могу экспортировать файлы");
-        println!("{out}");
-        let _ = ofile.write(out.as_bytes());
+        let out = toml::to_string(&result).expect("Не могу экспортировать файлы результата");
+        ofile
+            .write(out.as_bytes())
+            .expect("Ошибка записи результата");
     }
 }
 
@@ -507,12 +512,13 @@ pub fn load_results(result_path: &String) -> TestResults {
 fn test_collector(model: Arc<Mutex<Model>>) {
     loop {
         {
-            println!("---");
+            println!("Проверка завершения времени тестирования");
             let mut done_tests: Vec<(String, String)> = vec![];
             {
                 let model = model.lock().unwrap();
                 for result in model.results.values().by_ref() {
-                    if result.variants.len() > 0 {
+                    if result.variants.len() > 0 && result.variants.last().unwrap().result.is_none()
+                    {
                         let username = &result.variants.last().unwrap().username;
                         let testname = &result.variants.last().unwrap().testname;
                         let res = model.is_test_time_is_over(username, &testname);

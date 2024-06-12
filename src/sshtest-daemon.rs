@@ -45,7 +45,13 @@ fn start_server(settings: Settings) -> Result<(), Box<dyn Error>> {
 fn export_results(results_filename: String, output_filename: String) -> Result<(), Box<dyn Error>> {
     let result_path = model::get_daemon_dir_path() + "/" + results_filename.as_str();
     let results = model::load_results(&result_path);
-    let mut file = std::fs::File::create(output_filename).expect("Не могу создать файл");
+    let mut file = match std::fs::File::create(output_filename.clone()) {
+        Ok(v) => v,
+        Err(err) => {
+            eprintln!("Не могу создать файл {output_filename}: {err}");
+            std::process::exit(1);
+        }
+    };
 
     for vars in results.values() {
         for var in &vars.variants {
@@ -54,8 +60,8 @@ fn export_results(results_filename: String, output_filename: String) -> Result<(
                     "{},{},{},{},{}\n",
                     var.testname,
                     var.username,
-                    var.timestamp.date_naive(),
-                    var.timestamp.time().format("%H:%M:%S"),
+                    var.timestamp.unwrap().date_naive(),
+                    var.timestamp.unwrap().time().format("%H:%M:%S"),
                     var.result.unwrap()
                 );
 
