@@ -13,18 +13,23 @@ mod model;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = get_arguments();
-    let settings = model::read_settings()?;
 
     match arguments.subcommand() {
         Some(("init", _)) => model::init::init_server(),
-        Some(("start", _)) => start_server(settings)?,
-        Some(("export-results", args)) => export_results(
+        Some(("start", _)) => {
+            let settings = model::read_settings()?;
+            start_server(settings)?
+        },
+        Some(("export-results", args)) => {
+            let settings = model::read_settings()?;
+            export_results(
             settings.result_path,
             args.get_one::<String>("filename")
                 .or(Some(&"output.csv".to_string()))
                 .unwrap()
                 .to_string(),
-        )?,
+        )?
+        },
         Some((&_, _)) => eprintln!("Неизвестная команда."),
         None => eprintln!("Необходимо указать команду. Для просмотра доступных кооманд используйте переметр --help"),
     };
@@ -40,7 +45,13 @@ fn start_server(settings: Settings) -> Result<(), Box<dyn Error>> {
 fn export_results(results_filename: String, output_filename: String) -> Result<(), Box<dyn Error>> {
     let result_path = model::get_daemon_dir_path() + "/" + results_filename.as_str();
     let results = model::load_results(&result_path);
-    let mut file = std::fs::File::create(output_filename).expect("Не могу создать файл");
+    let mut file = match std::fs::File::create(output_filename.clone()) {
+        Ok(v) => v,
+        Err(err) => {
+            eprintln!("Не могу создать файл {output_filename}: {err}");
+            std::process::exit(1);
+        }
+    };
 
     for vars in results.values() {
         for var in &vars.variants {
@@ -49,8 +60,8 @@ fn export_results(results_filename: String, output_filename: String) -> Result<(
                     "{},{},{},{},{}\n",
                     var.testname,
                     var.username,
-                    var.timestamp.date_naive(),
-                    var.timestamp.time().format("%H:%M:%S"),
+                    var.timestamp.unwrap().date_naive(),
+                    var.timestamp.unwrap().time().format("%H:%M:%S"),
                     var.result.unwrap()
                 );
 
@@ -90,7 +101,7 @@ fn get_arguments() -> clap::ArgMatches {
 
 /// Open listener and run mainloop
 fn server_mainloop(presenter: &mut Presenter) {
-    let address = presenter.model.get_server_address();
+    let address = presenter.model.lock().unwrap().get_server_address();
     println!("* Открываю порт сервера: {}", address);
     let listener = TcpListener::bind(address).expect("Не могу открыть соединение");
 

@@ -1,9 +1,10 @@
+use std::collections::hash_map::HashMap;
 use std::env::set_current_dir;
 use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
-use std::collections::hash_map::HashMap;
+use std::sync::{Arc, Mutex};
 
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
@@ -35,13 +36,20 @@ pub struct Test {
     #[serde(default)]
     pub questions: Vec<Question>,
 
+    #[serde(default)]
     pub questions_number: usize,
+
+    #[serde(default)]
     pub test_duration_minutes: i64,
+
+    #[serde(default)]
     pub number_of_attempts: usize,
 
     /// Castumization
+    #[serde(default)]
     pub show_results: bool,
 
+    #[serde(default)]
     pub allowed_users: Vec<String>,
 }
 
@@ -64,7 +72,7 @@ impl std::default::Default for Test {
 pub struct Variant {
     pub username: String,
     pub testname: String,
-    pub timestamp: chrono::DateTime<chrono::Local>,
+    pub timestamp: Option<chrono::DateTime<chrono::Local>>,
     questions: Vec<Question>,
     answers: Vec<Vec<usize>>,
     current_question: usize,
@@ -78,7 +86,6 @@ pub struct Variants {
 
 type TestResults = std::collections::hash_map::HashMap<String, Variants>;
 
-// TODO Использовать эту структуру и потом переносить в поля модели
 #[derive(Deserialize, Debug)]
 pub struct Settings {
     #[serde(default)]
@@ -92,10 +99,8 @@ pub struct Settings {
 
     #[serde(default)]
     #[serde(rename = "test")]
-    pub tests: Vec<Test>
+    pub tests: Vec<Test>,
 }
-
-
 
 impl std::default::Default for Settings {
     fn default() -> Settings {
@@ -108,7 +113,6 @@ impl std::default::Default for Settings {
     }
 }
 
-
 #[derive(Deserialize, Debug)]
 pub struct Model {
     result_path: String,
@@ -117,12 +121,11 @@ pub struct Model {
     results: TestResults,
 }
 
-
 impl Model {
-    pub fn new(settings: Settings) -> Model {
+    pub fn begin(settings: Settings) -> Arc<Mutex<Model>> {
         println!("* Чтение тестов: ");
         set_daemon_dir().expect("Error init and start server");
-        
+
         // Read tests
         let quests_base_path = Path::new(&settings.tests_directory_path);
         let mut tests: HashMap<String, Test> = HashMap::new();
@@ -137,13 +140,18 @@ impl Model {
         }
 
         let results = load_results(&settings.result_path);
-        
-        Model {
+
+        let model = Arc::new(Mutex::new(Model {
             server_address: settings.server_address,
             result_path: settings.result_path,
             tests,
             results,
-        }
+        }));
+
+        let arc_model = Arc::clone(&model);
+        std::thread::spawn(|| test_collector(arc_model));
+
+        model
     }
 
     pub fn get_server_address(&self) -> String {
@@ -151,13 +159,19 @@ impl Model {
     }
 
     pub fn get_banner(&self, testname: &String) -> ModelResult<String> {
-        Ok(self.tests.get(testname)
+        Ok(self
+            .tests
+            .get(testname)
             .unwrap_or(&Test::default())
-            .banner.clone())
+            .banner
+            .clone())
     }
 
     pub fn is_allowed_user(&self, username: &String, testname: &String) -> ModelResult<bool> {
-        let test = &self.tests.get(testname).ok_or(ModelError::TestNotExist(testname.to_string()))?;
+        let test = &self
+            .tests
+            .get(testname)
+            .ok_or(ModelError::TestNotExist(testname.to_string()))?;
         Ok(test.allowed_users.contains(username))
     }
 
@@ -183,7 +197,10 @@ impl Model {
     fn is_user_done_test(&self, username: &String, testname: &String) -> ModelResult<bool> {
         let result_mark = username.to_owned() + "@" + testname;
         if self.results.contains_key(&result_mark) {
-            let test = &self.tests.get(testname).ok_or(ModelError::TestNotExist(testname.to_string()))?;
+            let test = &self
+                .tests
+                .get(testname)
+                .ok_or(ModelError::TestNotExist(testname.to_string()))?;
             if self.results.get(&result_mark).unwrap().variants.len() >= test.number_of_attempts {
                 return Ok(true);
             }
@@ -211,7 +228,10 @@ impl Model {
     }
 
     fn generate_variant(&self, username: &String, testname: &String) -> ModelResult<Variant> {
-        let test = &self.tests.get(testname).ok_or(ModelError::TestNotExist(testname.to_string()))?;
+        let test = &self
+            .tests
+            .get(testname)
+            .ok_or(ModelError::TestNotExist(testname.to_string()))?;
 
         let questions: Vec<Question> = test
             .questions
@@ -222,7 +242,7 @@ impl Model {
         Ok(Variant {
             username: username.clone(),
             testname: testname.clone(),
-            timestamp: chrono::offset::Local::now(),
+            timestamp: None,
             questions,
             answers: vec![],
             current_question: 0,
@@ -230,7 +250,6 @@ impl Model {
         })
     }
 
-    
     fn create_test_record(&mut self, username: &String, testname: &String, variant: Variant) {
         let result_mark = username.to_owned() + "@" + testname;
         if !self.results.contains_key(&result_mark) {
@@ -261,7 +280,9 @@ impl Model {
     fn is_test_time_is_over(&self, username: &String, testname: &String) -> ModelResult<bool> {
         let result_mark = username.to_owned() + "@" + testname;
         if self.results.contains_key(&result_mark) {
-            let test = &self.tests.get(testname)
+            let test = &self
+                .tests
+                .get(testname)
                 .ok_or(ModelError::TestNotExist(testname.to_string()))?;
             let variant = &self
                 .results
@@ -271,7 +292,11 @@ impl Model {
                 .last()
                 .unwrap();
 
-            if (chrono::Local::now() - variant.timestamp)
+            if variant.timestamp.is_none() {
+                return Ok(false);
+            }
+
+            if (chrono::Local::now() - variant.timestamp.unwrap())
                 > chrono::Duration::new(test.test_duration_minutes * 60, 0).unwrap()
             {
                 return Ok(true);
@@ -306,17 +331,19 @@ impl Model {
             return Err(ModelError::TestIsDone);
         }
 
-        let id = self.results[&result_mark]
-            .variants
-            .last()
+        let variant = self
+            .results
+            .get_mut(&result_mark)
             .unwrap()
-            .current_question;
-        return Ok(self.results[&result_mark]
             .variants
-            .last()
-            .unwrap()
-            .questions[id]
-            .clone());
+            .last_mut()
+            .unwrap();
+        if variant.timestamp.is_none() {
+            variant.timestamp = Some(chrono::offset::Local::now());
+        }
+
+        let id = variant.current_question;
+        return Ok(variant.questions[id].clone());
     }
 
     pub fn is_next_question(&self, username: &String, testname: &String) -> ModelResult<bool> {
@@ -396,15 +423,12 @@ impl Model {
         username: &String,
         testname: &String,
     ) -> ModelResult<String> {
-        let test = &self.tests.get(testname)
+        let test = &self
+            .tests
+            .get(testname)
             .ok_or(ModelError::TestNotExist(testname.to_string()))?;
         Ok(self.get_result(username, test)?)
     }
-
-    /*pub fn collect_done_tests(&mut self) {
-        // TODO Add result collector: Automatically end tests with time is over
-        println!("Starting collector of done tests");
-    }*/
 
     fn done_test(&mut self, username: &String, testname: &String) {
         self.calculate_mark(username, testname);
@@ -412,7 +436,6 @@ impl Model {
     }
 
     fn calculate_mark(&mut self, username: &String, testname: &String) {
-        // TODO
         let result_mark = username.to_owned() + "@" + testname;
         if self.results.contains_key(&result_mark) {
             let variant = &mut self
@@ -423,7 +446,7 @@ impl Model {
                 .last_mut()
                 .unwrap();
             let mut result = 0;
-            for i in 0..variant.questions.len() {
+            for i in 0..variant.answers.len() {
                 variant.answers[i].sort();
                 if variant.questions[i].correct_answers == variant.answers[i] {
                     result += 1;
@@ -437,20 +460,15 @@ impl Model {
         let result_mark = username.to_owned() + "@" + testname;
 
         let filename = self.result_path.to_owned() + "/" + &result_mark + ".toml";
-        println!("{filename}");
-        let mut ofile = File::create(filename).expect("Не могу открыть файл");
+        let mut ofile = File::create(filename).expect("Не могу открыть файл результата");
 
         let result = &self.results[&result_mark];
-        println!("{:?}", result);
 
-        let out = toml::to_string(&result).expect("Не могу экспортировать файлы");
-        println!("{out}");
-        let _ = ofile.write(out.as_bytes());
+        let out = toml::to_string(&result).expect("Не могу экспортировать файлы результата");
+        ofile
+            .write(out.as_bytes())
+            .expect("Ошибка записи результата");
     }
-
-    /*pub fn get_results(&self) -> TestResults {
-        self.results.clone()
-    }*/
 }
 
 pub fn read_settings() -> Result<Settings, Box<dyn Error>> {
@@ -489,6 +507,35 @@ pub fn load_results(result_path: &String) -> TestResults {
     results
 }
 
+fn test_collector(model: Arc<Mutex<Model>>) {
+    loop {
+        {
+            println!("Проверка завершения времени тестирования");
+            let mut done_tests: Vec<(String, String)> = vec![];
+            {
+                let model = model.lock().unwrap();
+                for result in model.results.values().by_ref() {
+                    if result.variants.len() > 0 && result.variants.last().unwrap().result.is_none()
+                    {
+                        let username = &result.variants.last().unwrap().username;
+                        let testname = &result.variants.last().unwrap().testname;
+                        let res = model.is_test_time_is_over(username, &testname);
+                        if res.is_ok() && res.unwrap() {
+                            println!("{username}, {testname}");
+                            done_tests.push((username.clone(), testname.clone()));
+                        }
+                    }
+                }
+            }
+
+            for (username, testname) in done_tests {
+                model.lock().unwrap().done_test(&username, &testname);
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_secs(30));
+    }
+}
+
 fn load_results_from_file(result_filename: &Path) -> Result<Variants, Box<dyn Error>> {
     let mut file = File::open(result_filename)?;
     let mut results_string = String::new();
@@ -498,7 +545,7 @@ fn load_results_from_file(result_filename: &Path) -> Result<Variants, Box<dyn Er
 
 fn set_daemon_dir() -> Result<(), Box<dyn Error>> {
     let daemon_path = get_daemon_dir_path();
-    let root = std::path::Path::new(&daemon_path); // TODO
+    let root = std::path::Path::new(&daemon_path);
     if set_current_dir(&root).is_err() {
         eprintln!(
             "Ошибка доступа к каталогу сервера {}.",
@@ -511,5 +558,5 @@ fn set_daemon_dir() -> Result<(), Box<dyn Error>> {
 }
 
 pub fn get_daemon_dir_path() -> String {
-    "/home/asd/code/desktop/sshtest/sshtest-dir".to_string()
+    "/opt/sshtest".to_string()
 }
