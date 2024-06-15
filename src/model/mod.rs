@@ -86,7 +86,6 @@ pub struct Variants {
 
 type TestResults = std::collections::hash_map::HashMap<String, Variants>;
 
-// TODO Использовать эту структуру и потом переносить в поля модели
 #[derive(Deserialize, Debug)]
 pub struct Settings {
     #[serde(default)]
@@ -437,7 +436,6 @@ impl Model {
     }
 
     fn calculate_mark(&mut self, username: &String, testname: &String) {
-        // TODO
         let result_mark = username.to_owned() + "@" + testname;
         if self.results.contains_key(&result_mark) {
             let variant = &mut self
@@ -534,7 +532,7 @@ fn test_collector(model: Arc<Mutex<Model>>) {
                 model.lock().unwrap().done_test(&username, &testname);
             }
         }
-        std::thread::sleep(std::time::Duration::from_secs(3));
+        std::thread::sleep(std::time::Duration::from_secs(30));
     }
 }
 
@@ -547,7 +545,7 @@ fn load_results_from_file(result_filename: &Path) -> Result<Variants, Box<dyn Er
 
 fn set_daemon_dir() -> Result<(), Box<dyn Error>> {
     let daemon_path = get_daemon_dir_path();
-    let root = std::path::Path::new(&daemon_path); // TODO
+    let root = std::path::Path::new(&daemon_path);
     if set_current_dir(&root).is_err() {
         eprintln!(
             "Ошибка доступа к каталогу сервера {}.",
