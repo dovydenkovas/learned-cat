@@ -1,6 +1,6 @@
 [package]
-name = "sshtest"
-version = "0.1.0"
+name = "learned-cat"
+version = "0.1.2"
 edition = "2021"
 
 
@@ -17,9 +17,9 @@ rustyline = "14.0.0"
 
 
 [[bin]]
-name = "sshtest-daemon"
-path = "src/sshtest-daemon.rs"
+name = "learned-cat-daemon"
+path = "src/daemon.rs"
 
 [[bin]]
-name = "sshtest"
-path = "src/sshtest.rs"
+name = "learned-cat"
+path = "src/client.rs"

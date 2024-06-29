@@ -1,4 +1,4 @@
 all:
 	cargo	build --release
-	cp target/release/sshtest sshtest
-	cp target/release/sshtest-daemon sshtest-daemon
+	cp target/release/learned-cat learned-cat
+	cp target/release/learned-cat-daemon learned-cat-daemon
