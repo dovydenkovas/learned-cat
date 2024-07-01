@@ -74,13 +74,13 @@ fn export_results(results_filename: String, output_filename: String) -> Result<(
 }
 
 fn get_arguments() -> clap::ArgMatches {
-    clap::Command::new("sshtest-server")
+    clap::Command::new("learned-cat-server")
         .version("0.1.0")
         .author("Aleksandr Dovydenkov. <asdovydenkov@gmail.com>")
         .about("Сервер тестирования в терминале. ")
         .subcommand(
             clap::Command::new("init")
-                .about("создать файлы сервера в каталоге /opt/sshtest")
+                .about("создать файлы сервера в каталоге /opt/learned-cat")
                 .arg(arg!([postgres_credentials])),
         )
 
