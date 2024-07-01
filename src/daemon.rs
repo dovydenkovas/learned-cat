@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     match arguments.subcommand() {
         Some(("init", _)) => model::init::init_server(),
-        Some(("start", _)) => {
+        Some(("run", _)) => {
             let settings = model::read_settings()?;
             start_server(settings)?
         },
@@ -80,19 +80,23 @@ fn get_arguments() -> clap::ArgMatches {
         .about("Сервер тестирования в терминале. ")
         .subcommand(
             clap::Command::new("init")
+                .short_flag('i')
                 .about("создать файлы сервера в каталоге /opt/learned-cat")
+
                 .arg(arg!([postgres_credentials])),
         )
 
         .subcommand(
-            clap::Command::new("start")
+            clap::Command::new("run")
+                .short_flag('r')
                 .about("запустить сервер")
+
         )
 
         .subcommand(
             clap::Command::new("export-results")
-
-            .about("экспортировать результаты тестирования в виде csv таблицы следующего формата: <test>,<student>,<date>,<time>,<result>")
+                .short_flag('o')
+                .about("экспортировать результаты тестирования в виде csv таблицы следующего формата: <test>,<student>,<date>,<time>,<result>")
                 .arg(arg!([filename]).required(true)),
         )
 
