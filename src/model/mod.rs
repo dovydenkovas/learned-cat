@@ -558,5 +558,5 @@ fn set_daemon_dir() -> Result<(), Box<dyn Error>> {
 }
 
 pub fn get_daemon_dir_path() -> String {
-    "/opt/sshtest".to_string()
+    "/opt/learned-cat".to_string()
 }
