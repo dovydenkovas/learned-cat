@@ -100,6 +100,9 @@ pub struct Settings {
     #[serde(default)]
     #[serde(rename = "test")]
     pub tests: Vec<Test>,
+
+    #[serde(default)]
+    pub new_file_permissions: u32,
 }
 
 impl std::default::Default for Settings {
@@ -109,6 +112,7 @@ impl std::default::Default for Settings {
             result_path: "results".to_string(),
             server_address: "127.0.0.1:65001".to_string(),
             tests: vec![],
+            new_file_permissions: 0o640,
         }
     }
 }
@@ -119,6 +123,7 @@ pub struct Model {
     server_address: String,
     tests: HashMap<String, Test>,
     results: TestResults,
+    new_file_permissions: u32,
 }
 
 impl Model {
@@ -146,6 +151,7 @@ impl Model {
             result_path: settings.result_path,
             tests,
             results,
+            new_file_permissions: settings.new_file_permissions,
         }));
 
         let arc_model = Arc::clone(&model);
@@ -460,14 +466,16 @@ impl Model {
         let result_mark = username.to_owned() + "@" + testname;
 
         let filename = self.result_path.to_owned() + "/" + &result_mark + ".toml";
-        let mut ofile = File::create(filename).expect("Не могу открыть файл результата");
-
+        let mut ofile = File::create(&filename).expect("Не могу открыть файл результата");
+        let path = Path::new(&filename);
         let result = &self.results[&result_mark];
 
         let out = toml::to_string(&result).expect("Не могу экспортировать файлы результата");
         ofile
             .write(out.as_bytes())
             .expect("Ошибка записи результата");
+
+        init::chmod(path, self.new_file_permissions);
     }
 }
 
