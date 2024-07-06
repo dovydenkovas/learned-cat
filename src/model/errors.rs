@@ -9,6 +9,7 @@ pub enum ModelError {
     UserNotAllowed,
     VariantNotExist(String),
     TestIsOpened(String, String),
+    TestNotStarted,
 }
 
 impl std::fmt::Display for ModelError {
@@ -22,6 +23,7 @@ impl std::fmt::Display for ModelError {
             ModelError::TestIsOpened(user, test) => {
                 format!("Тест {test} уже выполняется пользователем {user}.")
             }
+            ModelError::TestNotStarted => "Тест не запущен".to_string(),
         };
         write!(f, "{res}")
     }

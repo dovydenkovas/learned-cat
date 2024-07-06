@@ -53,7 +53,7 @@ pub enum Command {
     PutAnswer { answer: Vec<usize> },
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Response {
     AvaliableTests {
         tests: Vec<(String, String)>,
