@@ -7,6 +7,18 @@ use std::process::exit;
 const DIR_PERMISSIONS: u32 = 0o750;
 const FILE_PERMISSIONS: u32 = 0o640;
 
+/// Change file permissions.
+///
+/// _path_ - path to file or directory.
+///
+/// _mode_ - unix permissions mask in octal notation.
+///
+/// # Examples
+///
+/// ```
+/// chmod("/opt/example", 0o770);
+/// chmod("settings.toml", 0o664);
+/// ```
 pub fn chmod(path: &Path, mode: u32) {
     let file = File::open(path).expect("Ошибка доступа к корневой дирректории");
     let metadata = file.metadata().expect("Ошибка чтения прав доступа");
@@ -16,10 +28,9 @@ pub fn chmod(path: &Path, mode: u32) {
         .expect("Ошибка установки прав доступа");
 }
 
-pub fn init_server() {
+/// Create server files with example configuration
+pub fn init_server(path: &Path) {
     println!(" * Создание файлов сервера");
-    let path = crate::model::get_daemon_dir_path();
-    let path = Path::new(&path);
     create_root(path);
     if !path.join("results").exists() {
         std::fs::create_dir(path.join("results")).expect("Ошибка создание дирректории результатов");
@@ -34,6 +45,7 @@ pub fn init_server() {
     create_example_test(path);
 }
 
+/// Create main directory and set permissions.
 fn create_root(path: &Path) {
     if !path.exists() {
         if std::fs::create_dir(path).is_err() {
@@ -47,6 +59,7 @@ fn create_root(path: &Path) {
     }
 }
 
+/// Create example settings with all parameters.
 fn create_settings(path: &Path) {
     let path = path.join("settings.toml");
     if path.exists() {
@@ -101,4 +114,54 @@ fn create_example_test(path: &Path) {
     file.write(example_settings.as_bytes())
         .expect("Ошибка сохранения примера теста");
     chmod(path.as_path(), FILE_PERMISSIONS);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn get_perms(path: &Path) -> u32 {
+        path.metadata().unwrap().permissions().mode() & 0o777
+    }
+
+    #[test]
+    fn chmnod_test() {
+        let dir = std::env::temp_dir();
+        let path = dir.join("chmod_test.txt");
+        let _ = File::create(&path).unwrap();
+        chmod(path.as_path(), 0o765);
+
+        let perms = get_perms(path.as_path());
+        std::fs::remove_file(path).unwrap();
+
+        assert_eq!(perms & 0o777, 0o765);
+    }
+
+    #[test]
+    fn init_server_test() {
+        let dir = std::env::temp_dir();
+        let path = dir.join("server_example");
+        init_server(path.as_path());
+
+        assert!(path.exists());
+        assert!(path.join("settings.toml").exists());
+        assert!(path.join("tests").exists());
+        assert!(path.join("results").exists());
+        assert!(path.join("tests/linux.md").exists());
+        assert_eq!(get_perms(path.as_path()), DIR_PERMISSIONS);
+        assert_eq!(
+            get_perms(path.join("settings.toml").as_path()),
+            FILE_PERMISSIONS
+        );
+
+        assert_eq!(get_perms(path.join("tests").as_path()), DIR_PERMISSIONS);
+
+        assert_eq!(get_perms(path.join("results").as_path()), DIR_PERMISSIONS);
+
+        assert_eq!(
+            get_perms(path.join("tests/linux.md").as_path()),
+            FILE_PERMISSIONS
+        );
+        std::fs::remove_dir_all(path).unwrap();
+    }
 }
