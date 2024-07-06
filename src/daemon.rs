@@ -1,9 +1,9 @@
 use crate::model::Settings;
+use clap::arg;
 use std::error::Error;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-
-use clap::arg;
+use std::path::Path;
 
 mod network;
 use network::Request;
@@ -15,7 +15,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let arguments = get_arguments();
 
     match arguments.subcommand() {
-        Some(("init", _)) => model::init::init_server(),
+        Some(("init", _)) => {
+            let path = crate::model::get_daemon_dir_path();
+            let path = Path::new(&path);
+            model::init::init_server(path)
+        },
         Some(("run", _)) => {
             let settings = model::read_settings()?;
             start_server(settings)?
