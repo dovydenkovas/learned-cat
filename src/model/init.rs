@@ -42,7 +42,7 @@ pub fn init_server(path: &Path) {
         chmod(path.join("tests").as_path(), DIR_PERMISSIONS);
     }
     create_settings(path);
-    create_example_test(path);
+    create_example_tests(path);
 }
 
 /// Create main directory and set permissions.
@@ -60,8 +60,8 @@ fn create_root(path: &Path) {
 }
 
 /// Create example settings with all parameters.
-fn create_settings(path: &Path) {
-    let path = path.join("settings.toml");
+fn create_settings(dir_path: &Path) {
+    let path = dir_path.join("settings.toml");
     if path.exists() {
         return;
     }
@@ -72,11 +72,19 @@ new_file_permissions = 0o644 # Права доступа файла резуль
 
 [[test]]
 caption="linux" # Название теста (необходимо для запуска теста и поиска файла теста)
-questions_number = 2 # Количество вопросов, которые необходимо выбрать для генерации варианта
+questions_number = 1 # Количество вопросов, которые необходимо выбрать для генерации варианта
 test_duration_minutes = 5 # Ограничение тестирования по времени
 show_results = true # Показывать ли баллы пользователю
 allowed_users = ["student1", "student2"] # Имена пользователей, имеющих право выполнять тест
-number_of_attempts = 3 # Разрешенное количество попыток
+number_of_attempts = 1 # Разрешенное количество попыток
+
+[[test]]
+caption="python"
+questions_number = 2
+test_duration_minutes = 1
+show_results = false
+allowed_users = ["student2"]
+number_of_attempts = 0
 "#;
 
     let mut file = File::create(&path).expect("Ошибка создания файла настоек");
@@ -86,12 +94,12 @@ number_of_attempts = 3 # Разрешенное количество попыт�
     chmod(path.as_path(), FILE_PERMISSIONS);
 }
 
-fn create_example_test(path: &Path) {
-    let path = path.join("tests").join("linux.md");
+fn create_example_tests(dir_path: &Path) {
+    let path = dir_path.join("tests").join("linux.md");
     if path.exists() {
         return;
     }
-    let example_settings = r#"Тестирование по командам ОС Linux. Успехов!
+    let test_linux = r#"Тестирование по командам ОС Linux. Успехов!
 
 # Что делает утилита cat?
 * Вызывает кота, который бегает за курсором мыши
@@ -111,7 +119,27 @@ fn create_example_test(path: &Path) {
 "#;
 
     let mut file = File::create(&path).expect("Ошибка создания примера теста");
-    file.write(example_settings.as_bytes())
+    file.write(test_linux.as_bytes())
+        .expect("Ошибка сохранения примера теста");
+    chmod(path.as_path(), FILE_PERMISSIONS);
+
+    let path = dir_path.join("tests").join("python.md");
+    if path.exists() {
+        return;
+    }
+    let test_python = r#"Тестирование по Python
+
+    # Python
+    * компилируемый
+    + интерпретируемый
+
+    # Функция map
+    * Выводит карту сокровищ
+    + Применяет функцию к каждому элементу последовательности
+    "#;
+
+    let mut file = File::create(&path).expect("Ошибка создания примера теста");
+    file.write(test_python.as_bytes())
         .expect("Ошибка сохранения примера теста");
     chmod(path.as_path(), FILE_PERMISSIONS);
 }
@@ -125,7 +153,7 @@ mod tests {
     }
 
     #[test]
-    fn chmnod_test() {
+    fn chmod_test() {
         let dir = std::env::temp_dir();
         let path = dir.join("chmod_test.txt");
         let _ = File::create(&path).unwrap();
@@ -140,7 +168,7 @@ mod tests {
     #[test]
     fn init_server_test() {
         let dir = std::env::temp_dir();
-        let path = dir.join("server_example");
+        let path = dir.join("server_example_init_test");
         init_server(path.as_path());
 
         assert!(path.exists());
@@ -162,6 +190,6 @@ mod tests {
             get_perms(path.join("tests/linux.md").as_path()),
             FILE_PERMISSIONS
         );
-        std::fs::remove_dir_all(path).unwrap();
+        let _ = std::fs::remove_dir_all(path);
     }
 }

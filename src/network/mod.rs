@@ -35,6 +35,16 @@ pub struct Request {
     pub command: Command,
 }
 
+impl Request {
+    pub fn new<S: AsRef<str>>(user: S, test: S, command: Command) -> Request {
+        Request {
+            user: user.as_ref().to_string(),
+            test: test.as_ref().to_string(),
+            command,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Command {
     GetAvaliableTests,
