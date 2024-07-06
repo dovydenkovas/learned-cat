@@ -1,18 +1,15 @@
-/// Клиентское приложение программы тестирования. 
-/// Отправляет запросы на сервер и предоставляет пользовательский интерфейс. 
-
+/// Клиентское приложение программы тестирования.
+/// Отправляет запросы на сервер и предоставляет пользовательский интерфейс.
 use std::error::Error;
-use std::net::TcpStream;
 use std::io::prelude::*;
+use std::net::TcpStream;
 
 use clap::Parser;
-use whoami;
 use rustyline::DefaultEditor;
+use whoami;
 
 mod network;
-use network::{Response, Request, Command};
-
-
+use network::{Command, Request, Response};
 
 /// Структура аргументов командной строки.
 #[derive(Parser)]
@@ -20,12 +17,11 @@ use network::{Response, Request, Command};
 struct Cli {
     /// Название теста.
     name: Option<String>,
-    
+
     /// Отобразить доступные тесты.
     #[arg(short, long)]
     list: bool,
 }
-
 
 /// Парсит аргументы и запускает соответствующее действие.
 fn main() {
@@ -40,50 +36,50 @@ fn main() {
     }
 }
 
-
 /// Обслуживает процесс тестирования.
 fn start_test(test_name: String) {
     let request = Request {
         user: whoami::username(),
         test: test_name.clone(),
-        command: Command::StartTest 
+        command: Command::StartTest,
     };
 
-
     match send_request(&request) {
-        Ok(response) => {
-            match response {
-                Response::TestStarted { banner } => {
-                    println!("{banner}");
-                    println!("Вы готовы начать тестирование? (Введите <да> или <нет>)");
-                    if ask_yes() {
-                        run_test(test_name);
-                    }
-                                    },
-                
-                Response::End { result } => {
-                    println!("Тест завершен. Ваш результат: {}", result);
-                },
-
-                _ => eprintln!("Ошибка запуска теста."),
+        Ok(response) => match response {
+            Response::TestStarted { banner } => {
+                println!("{banner}");
+                println!("Вы готовы начать тестирование? (Введите <да> или <нет>)");
+                if ask_yes() {
+                    run_test(test_name, None);
+                }
             }
+
+            Response::NextQuestion { question, answers } => run_test(
+                test_name,
+                Some(Response::NextQuestion { question, answers }),
+            ),
+
+            Response::End { result } => {
+                println!("Тест завершен. Ваш результат: {}", result);
+            }
+
+            _ => eprintln!("Ошибка запуска теста."),
         },
-        Err(err) => eprintln!("Ошибка связи с сервером: {}", err.to_string())
+        Err(err) => eprintln!("Ошибка связи с сервером: {}", err.to_string()),
     }
 }
-
 
 fn ask_yes() -> bool {
     loop {
         let mut rl = match DefaultEditor::new() {
             Ok(v) => v,
-            _ => continue
+            _ => continue,
         };
 
         let s = match rl.readline(">>> ") {
             Ok(v) => v,
             Err(rustyline::error::ReadlineError::Eof) => std::process::exit(0),
-            _ => continue
+            _ => continue,
         };
         match s.trim().to_lowercase().as_str() {
             "yes" | "y" | "да" | "д" => return true,
@@ -93,15 +89,22 @@ fn ask_yes() -> bool {
     }
 }
 
-fn run_test(test_name: String) {
+fn run_test(test_name: String, next_question: Option<Response>) {
     let next_question_request = Request {
         user: whoami::username(),
         test: test_name.clone(),
-        command: Command::GetNextQuestion
+        command: Command::GetNextQuestion,
     };
 
+    let mut next_question = next_question;
     loop {
-        let response = send_request(&next_question_request);
+        let response = match next_question {
+            Some(q) => {
+                next_question = None;
+                Ok(q)
+            }
+            None => send_request(&next_question_request),
+        };
 
         match response {
             Ok(Response::NextQuestion { question, answers }) => {
@@ -109,37 +112,36 @@ fn run_test(test_name: String) {
                 let put_answer_request = Request {
                     user: whoami::username(),
                     test: test_name.clone(),
-                    command: Command::PutAnswer { answer: answers } 
+                    command: Command::PutAnswer { answer: answers },
                 };
 
                 match send_request(&put_answer_request) {
                     Ok(Response::End { result }) => {
                         println!("Тест завершен. Ваш результат: {}", result);
                         break;
-                    }, 
+                    }
 
                     _ => (),
                 }
-                
-            },
-            
+            }
+
             Ok(Response::End { result }) => {
                 println!("Тест завершен. Ваш результат: {}", result);
                 break;
-            },
-            
-            _ => ()
+            }
+
+            _ => (),
         }
     }
 }
 
-/// Задает вопрос 
-fn ask_question(question: String, answers: Vec<String>) -> Vec<usize> { 
+/// Задает вопрос
+fn ask_question(question: String, answers: Vec<String>) -> Vec<usize> {
     println!("");
-    println!("{:>len$}", "***", len=question.len()/2-1);
+    println!("{:>len$}", "***", len = question.len() / 2 - 1);
     println!("{question}");
     for i in 0..answers.len() {
-        println!("{}) {}", i+1, answers[i]);
+        println!("{}) {}", i + 1, answers[i]);
     }
 
     'ask: loop {
@@ -152,7 +154,7 @@ fn ask_question(question: String, answers: Vec<String>) -> Vec<usize> {
             .map(|x| match x.parse::<usize>() {
                 Ok(v) => v,
                 _ => 100000000,
-                })
+            })
             .collect();
 
         for i in 0..answer.len() {
@@ -172,65 +174,59 @@ fn ask_string() -> String {
     loop {
         let mut rl = match DefaultEditor::new() {
             Ok(v) => v,
-            _ => continue
+            _ => continue,
         };
 
         match rl.readline(">>> ") {
             Ok(v) => return v,
             Err(rustyline::error::ReadlineError::Eof) => std::process::exit(0),
-            _ => continue
+            _ => continue,
         };
     }
 }
 
 /// Выводит перечень тестов.
-fn print_avaliable_tests() { 
+fn print_avaliable_tests() {
     let request = Request {
         user: whoami::username(),
         test: "".to_string(),
-        command: Command::GetAvaliableTests
+        command: Command::GetAvaliableTests,
     };
 
     match send_request(&request) {
-        Ok(response) => {
-            match response {
-                Response::AvaliableTests { tests } => {
-                    println!("Перечень доступных тестов:");
-                    print_table(tests);
-                                    },
-                _ => eprintln!("Ошибка чтения списка тестов."),
+        Ok(response) => match response {
+            Response::AvaliableTests { tests } => {
+                println!("Перечень доступных тестов:");
+                print_table(tests);
             }
+            _ => eprintln!("Ошибка чтения списка тестов."),
         },
-        Err(err) => eprintln!("Ошибка связи с сервером: {}", err.to_string())
+        Err(err) => eprintln!("Ошибка связи с сервером: {}", err.to_string()),
     }
 }
 
-
-/// Вывод таблицы ключ-значение 
+/// Вывод таблицы ключ-значение
 fn print_table(values: Vec<(String, String)>) {
     let mut max_first = 0;
     for (first, _) in &values {
         max_first = std::cmp::max(max_first, first.len());
     }
-    
+
     println!("{:>max_first$}   Ваш результат", "Тест");
     for (first, second) in &values {
         println!("{first:>max_first$}   {second:>6}");
     }
 }
 
-
 /// Осуществляет связь с сервером.
-fn send_request(request: &Request)
-    -> Result<Response, Box<dyn Error>> {
-
+fn send_request(request: &Request) -> Result<Response, Box<dyn Error>> {
     let request = bincode::serialize(&request)?;
     let mut response = [0 as u8; 5000];
-    
+
     let mut stream = TcpStream::connect(get_server_address())?;
     stream.write(&request)?;
     let n_bytes = stream.read(&mut response)?;
-    
+
     let response = bincode::deserialize::<Response>(&response[..n_bytes])?;
     match response {
         Response::ServerError => {
@@ -239,15 +235,13 @@ fn send_request(request: &Request)
             std::process::exit(1);
         }
 
-        resp => return Ok(resp)
+        resp => return Ok(resp),
     };
 }
 
 fn get_server_address() -> String {
     match std::env::var("SERVER_ADDRESS") {
-        Ok(val) => {
-            val
-        }, 
-        Err(_) => "127.0.0.1:65001".to_string()
+        Ok(val) => val,
+        Err(_) => "127.0.0.1:65001".to_string(),
     }
 }

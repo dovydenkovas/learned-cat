@@ -1,9 +1,9 @@
 use crate::model::Settings;
+use clap::arg;
 use std::error::Error;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-
-use clap::arg;
+use std::path::{Path, PathBuf};
 
 mod network;
 use network::Request;
@@ -14,21 +14,25 @@ mod model;
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = get_arguments();
 
+    let root_path = get_daemon_dir_path();
     match arguments.subcommand() {
-        Some(("init", _)) => model::init::init_server(),
+        Some(("init", _)) => {
+            model::init::init_server(&root_path)
+        },
         Some(("run", _)) => {
-            let settings = model::read_settings()?;
-            start_server(settings)?
+            let settings = model::read_settings(&root_path)?;
+            start_server(settings, root_path)?
         },
         Some(("export-results", args)) => {
-            let settings = model::read_settings()?;
+            let settings = model::read_settings(&root_path)?;
             export_results(
             settings.result_path,
             args.get_one::<String>("filename")
                 .or(Some(&"output.csv".to_string()))
                 .unwrap()
                 .to_string(),
-        )?
+            &root_path,
+            )?
         },
         Some((&_, _)) => eprintln!("Неизвестная команда."),
         None => eprintln!("Необходимо указать команду. Для просмотра доступных кооманд используйте переметр --help"),
@@ -36,14 +40,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn start_server(settings: Settings) -> Result<(), Box<dyn Error>> {
-    let mut presenter: Presenter = Presenter::new(settings);
+fn start_server<P: AsRef<Path>>(settings: Settings, path: P) -> Result<(), Box<dyn Error>> {
+    let mut presenter: Presenter = Presenter::new(settings, path);
     server_mainloop(&mut presenter);
     Ok(())
 }
 
-fn export_results(results_filename: String, output_filename: String) -> Result<(), Box<dyn Error>> {
-    let result_path = model::get_daemon_dir_path() + "/" + results_filename.as_str();
+fn export_results<P: AsRef<Path>>(
+    results_filename: String,
+    output_filename: String,
+    root_path: P,
+) -> Result<(), Box<dyn Error>> {
+    let result_path = root_path.as_ref().join(results_filename);
     let results = model::load_results(&result_path);
     let mut file = match std::fs::File::create(output_filename.clone()) {
         Ok(v) => v,
@@ -135,4 +143,11 @@ fn handle_client(stream: &mut TcpStream, presenter: &mut Presenter) -> Result<()
 
     stream.write(&response)?;
     Ok(())
+}
+
+fn get_daemon_dir_path() -> PathBuf {
+    match std::env::var("LEARNED_CAT_PATH") {
+        Ok(v) => PathBuf::from(v),
+        Err(_) => PathBuf::from("/opt/learned-cat"),
+    }
 }
