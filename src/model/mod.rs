@@ -174,10 +174,10 @@ impl Model {
     }
 
     pub fn is_allowed_user(&self, username: &String, testname: &String) -> ModelResult<bool> {
-        let test = &self
-            .tests
-            .get(testname)
-            .ok_or(ModelError::TestNotExist(testname.to_string()))?;
+        let test = match &self.tests.get(testname) {
+            Some(v) => v.to_owned(),
+            None => return Ok(false),
+        };
         Ok(test.allowed_users.contains(username))
     }
 
@@ -566,5 +566,11 @@ fn set_daemon_dir() -> Result<(), Box<dyn Error>> {
 }
 
 pub fn get_daemon_dir_path() -> String {
-    "/opt/learned-cat".to_string()
+    match std::env::var("LEARNED_CAT_PATH") {
+        Ok(v) => {
+            println!("{v}");
+            v
+        }
+        Err(_) => "/opt/learned-cat".to_string(),
+    }
 }
