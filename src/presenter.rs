@@ -46,7 +46,7 @@ impl Presenter {
         }
 
         let response = match request.command {
-            Command::StartTest => {
+            Command::StartTest | Command::GetNextQuestion => {
                 let res = self
                     .model
                     .lock()
@@ -68,13 +68,26 @@ impl Presenter {
                 }
             }
 
-            Command::GetNextQuestion => self.get_next_question(&request.user, &request.test)?,
-
+            //Command::GetNextQuestion => match self.get_next_question(&request.user, &request.test)?,
             Command::PutAnswer { answer } => {
-                self.model
-                    .lock()
-                    .unwrap()
-                    .put_answer(&request.user, &request.test, &answer)?;
+                let res =
+                    self.model
+                        .lock()
+                        .unwrap()
+                        .put_answer(&request.user, &request.test, &answer);
+                match res {
+                    Ok(_) => (),
+                    Err(ModelError::TestIsDone) => {
+                        return Ok(Response::End {
+                            result: (self
+                                .model
+                                .lock()
+                                .unwrap()
+                                .get_result_by_testname(&request.user, &request.test)?),
+                        })
+                    }
+                    Err(err) => return Err(err),
+                };
                 if self
                     .model
                     .lock()
@@ -187,24 +200,18 @@ mod tests {
 
         // not exist test
         let req = Request::new("student1", "fake_test", Command::StartTest);
-        match presenter.serve_connection(req) {
-            Response::NotAllowedUser => assert!(true),
-            _ => assert!(false),
-        }
+        assert_eq!(presenter.serve_connection(req), Response::NotAllowedUser);
 
         // not allowed user
         let req = Request::new("cat_user", "linux", Command::StartTest);
-        match presenter.serve_connection(req) {
-            Response::NotAllowedUser => assert!(true),
-            _ => assert!(false),
-        }
+        assert_eq!(presenter.serve_connection(req), Response::NotAllowedUser);
 
         // new user
         let req = Request::new("student1", "linux", Command::StartTest);
-        match presenter.serve_connection(req) {
-            Response::TestStarted { banner } => assert!(banner.len() > 0),
-            resp => assert!(false, "got <{:?}> expected TestStarted", resp),
-        }
+        assert!(matches!(
+            presenter.serve_connection(req),
+            Response::TestStarted { .. }
+        ));
 
         // test is running
         let req = Request::new("student1", "linux", Command::StartTest);
@@ -213,39 +220,85 @@ mod tests {
         let req = Request::new("student1", "linux", Command::GetNextQuestion);
         presenter.serve_connection(req);
         let req = Request::new("student1", "linux", Command::StartTest);
-
-        match presenter.serve_connection(req) {
-            Response::NextQuestion { question, answers } => {
-                assert!(question.len() > 0 && answers.len() > 0)
-            }
-            resp => assert!(false, "{:?}", resp),
-        }
+        assert!(matches!(
+            presenter.serve_connection(req),
+            Response::NextQuestion { .. }
+        ));
 
         // test is done
         let req = Request::new("student1", "linux", Command::PutAnswer { answer: vec![0] });
         presenter.serve_connection(req);
         let req = Request::new("student1", "linux", Command::StartTest);
-        match presenter.serve_connection(req) {
-            Response::End { result } => assert!(true),
-            _ => assert!(false),
-        }
+        assert_eq!(
+            presenter.serve_connection(req),
+            Response::End {
+                result: "0".to_string()
+            }
+        );
 
         free_resource("test_scst");
     }
 
     #[test]
     fn server_connection_getnext_test() {
+        free_resource("test_scgt");
+        let mut presenter = get_test_presenter("test_scgt");
+
         // not allowed user
+        let req = Request::new("cat_user", "linux", Command::GetNextQuestion);
+        assert_eq!(presenter.serve_connection(req), Response::NotAllowedUser);
+
         // new user
+        let req = Request::new("student1", "linux", Command::GetNextQuestion);
+        assert!(matches!(
+            presenter.serve_connection(req),
+            Response::TestStarted { .. }
+        ));
+
         // test is running
+
         // test is done
+
+        free_resource("test_scgt");
     }
 
     #[test]
     fn server_connection_putanswer_test() {
+        free_resource("test_scpt");
+        let mut presenter = get_test_presenter("test_scpt");
+
         // not allowed user
+        let req = Request::new("cat_user", "linux", Command::PutAnswer { answer: vec![0] });
+        assert_eq!(presenter.serve_connection(req), Response::NotAllowedUser);
+
         // new user
+        let req = Request::new("student1", "linux", Command::PutAnswer { answer: vec![0] });
+        assert_eq!(presenter.serve_connection(req), Response::ServerError);
+
+        // test is started
+        let req = Request::new("student1", "linux", Command::StartTest);
+        presenter.serve_connection(req);
+        let req = Request::new("student1", "linux", Command::PutAnswer { answer: vec![0] });
+        assert_eq!(presenter.serve_connection(req), Response::ServerError);
+
         // test is running
+        let req = Request::new("student1", "linux", Command::StartTest);
+        presenter.serve_connection(req);
+        let req = Request::new("student1", "linux", Command::GetNextQuestion);
+        presenter.serve_connection(req);
+        let req = Request::new("student1", "linux", Command::PutAnswer { answer: vec![0] });
+        assert!(matches!(
+            presenter.serve_connection(req),
+            Response::End { .. }
+        ));
+
         // test is done
+        let req = Request::new("student1", "linux", Command::PutAnswer { answer: vec![0] });
+        assert!(matches!(
+            presenter.serve_connection(req),
+            Response::End { .. }
+        ));
+
+        free_resource("test_scpt");
     }
 }

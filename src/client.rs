@@ -63,7 +63,7 @@ fn start_test(test_name: String) {
                 println!("Тест завершен. Ваш результат: {}", result);
             }
 
-            _ => eprintln!("Ошибка запуска теста."),
+            _ => eprintln!("Теста не существует или доступ к нему закрыт."),
         },
         Err(err) => eprintln!("Ошибка связи с сервером: {}", err.to_string()),
     }
