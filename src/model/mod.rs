@@ -3,7 +3,7 @@ use std::env::set_current_dir;
 use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use rand::seq::SliceRandom;
@@ -16,6 +16,7 @@ pub mod init;
 pub mod parsetest;
 use errors::{ModelError, ModelResult};
 use parsetest::read_test;
+use whoami::username;
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct Question {
@@ -119,17 +120,18 @@ impl std::default::Default for Settings {
 
 #[derive(Deserialize, Debug)]
 pub struct Model {
-    result_path: String,
+    result_path: PathBuf,
     server_address: String,
     tests: HashMap<String, Test>,
     results: TestResults,
     new_file_permissions: u32,
+    root_path: PathBuf,
 }
 
 impl Model {
-    pub fn begin(settings: Settings) -> Arc<Mutex<Model>> {
+    pub fn begin<P: AsRef<Path>>(settings: Settings, root_path: P) -> Arc<Mutex<Model>> {
         println!("* Чтение тестов: ");
-        set_daemon_dir().expect("Error init and start server");
+        set_daemon_dir(&root_path).expect("Error init and start server");
 
         // Read tests
         let quests_base_path = Path::new(&settings.tests_directory_path);
@@ -148,10 +150,11 @@ impl Model {
 
         let model = Arc::new(Mutex::new(Model {
             server_address: settings.server_address,
-            result_path: settings.result_path,
+            result_path: PathBuf::from(settings.result_path),
             tests,
             results,
             new_file_permissions: settings.new_file_permissions,
+            root_path: root_path.as_ref().into(),
         }));
 
         let arc_model = Arc::clone(&model);
@@ -191,7 +194,7 @@ impl Model {
         }
 
         if self.is_user_have_opened_variant(username, testname)? {
-            return Ok(self.get_banner(testname)?);
+            return Err(ModelError::TestIsOpened(username.clone(), testname.clone()));
         }
 
         let variant = self.generate_variant(username, testname)?;
@@ -207,7 +210,14 @@ impl Model {
                 .tests
                 .get(testname)
                 .ok_or(ModelError::TestNotExist(testname.to_string()))?;
-            if self.results.get(&result_mark).unwrap().variants.len() >= test.number_of_attempts {
+            if self.results[&result_mark].variants.len() >= test.number_of_attempts
+                && self.results[&result_mark]
+                    .variants
+                    .last()
+                    .unwrap()
+                    .result
+                    .is_some()
+            {
                 return Ok(true);
             }
         }
@@ -465,7 +475,11 @@ impl Model {
     fn save_result(&mut self, username: &String, testname: &String) {
         let result_mark = username.to_owned() + "@" + testname;
 
-        let filename = self.result_path.to_owned() + "/" + &result_mark + ".toml";
+        let filename = self
+            .root_path
+            .join(&self.result_path)
+            .join(&result_mark)
+            .with_extension("toml");
         let mut ofile = File::create(&filename).expect("Не могу открыть файл результата");
         let path = Path::new(&filename);
         let result = &self.results[&result_mark];
@@ -479,21 +493,24 @@ impl Model {
     }
 }
 
-pub fn read_settings() -> Result<Settings, Box<dyn Error>> {
-    let settings_path = get_daemon_dir_path() + "/settings.toml";
+pub fn read_settings<P: AsRef<Path>>(path: P) -> Result<Settings, Box<dyn Error>> {
+    let settings_path = path.as_ref().join("settings.toml");
     let mut file = File::open(settings_path)?;
     let mut settings = String::new();
     file.read_to_string(&mut settings)?;
     Ok(from_toml(&settings)?)
 }
 
-pub fn load_results(result_path: &String) -> TestResults {
+pub fn load_results<P: AsRef<Path>>(result_path: P) -> TestResults {
     println!("* Чтение результатов:");
-    let _ = std::fs::create_dir(result_path);
+    let _ = std::fs::create_dir(&result_path);
 
     let mut results = std::collections::hash_map::HashMap::new();
 
-    for entry in WalkDir::new(result_path).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(&result_path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         if entry.path().is_file() {
             println!("   * {}", entry.path().display());
             match load_results_from_file(entry.path()) {
@@ -551,26 +568,14 @@ fn load_results_from_file(result_filename: &Path) -> Result<Variants, Box<dyn Er
     Ok(from_toml(&results_string)?)
 }
 
-fn set_daemon_dir() -> Result<(), Box<dyn Error>> {
-    let daemon_path = get_daemon_dir_path();
-    let root = std::path::Path::new(&daemon_path);
-    if set_current_dir(&root).is_err() {
+fn set_daemon_dir<P: AsRef<Path>>(path: P) -> Result<(), Box<dyn Error>> {
+    if set_current_dir(path.as_ref()).is_err() {
         eprintln!(
             "Ошибка доступа к каталогу сервера {}.",
-            root.to_str().unwrap()
+            path.as_ref().to_str().unwrap()
         );
         eprintln!("Проверьте, что каталог существует, и у процесса есть у нему доступ.");
         return Err(Box::new(std::fmt::Error));
     }
     Ok(())
-}
-
-pub fn get_daemon_dir_path() -> String {
-    match std::env::var("LEARNED_CAT_PATH") {
-        Ok(v) => {
-            println!("{v}");
-            v
-        }
-        Err(_) => "/opt/learned-cat".to_string(),
-    }
 }
