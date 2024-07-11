@@ -422,12 +422,18 @@ impl Model {
     fn get_result(&self, username: &String, test: &Test) -> ModelResult<String> {
         let result_mark = username.to_owned() + "@" + &test.caption;
         if self.results.contains_key(&result_mark) {
-            let mut result = 0;
+            let mut result = String::new();
+            let mut best_mark = 0;
             let mut has_result = false;
             for variant in &self.results[&result_mark].variants {
                 match variant.result {
                     Some(res) => {
-                        result = std::cmp::max(result, res);
+                        if test.show_results {
+                            best_mark = std::cmp::max(best_mark, res);
+                            result = best_mark.to_string();
+                        } else {
+                            result = "Тест завершен.".to_string();
+                        }
                         has_result = true;
                     }
                     None => (),
