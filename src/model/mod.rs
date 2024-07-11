@@ -595,3 +595,38 @@ fn set_daemon_dir<P: AsRef<Path>>(path: P) -> Result<(), Box<dyn Error>> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_daemon_dir_test() {
+        // TODO
+    }
+
+    #[test]
+    fn test_collector_test() {
+        // TODO
+    }
+
+    #[test]
+    fn read_settings_test() {
+        // TODO
+    }
+
+    #[test]
+    fn calculate_mark_test() {
+        // TODO
+    }
+
+    #[test]
+    fn put_answer() {
+        // TODO
+    }
+
+    #[test]
+    fn get_next_question() {
+        // TODO
+    }
+}
