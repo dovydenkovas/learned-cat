@@ -36,6 +36,7 @@ pub struct Request {
 }
 
 impl Request {
+    #[allow(dead_code)]
     pub fn new<S: AsRef<str>>(user: S, test: S, command: Command) -> Request {
         Request {
             user: user.as_ref().to_string(),
