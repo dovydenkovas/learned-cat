@@ -36,6 +36,7 @@ pub struct Request {
 }
 
 impl Request {
+    #[allow(dead_code)]
     pub fn new<S: AsRef<str>>(user: S, test: S, command: Command) -> Request {
         Request {
             user: user.as_ref().to_string(),
@@ -53,7 +54,7 @@ pub enum Command {
     PutAnswer { answer: Vec<usize> },
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Response {
     AvaliableTests {
         tests: Vec<(String, String)>,

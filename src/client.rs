@@ -38,11 +38,7 @@ fn main() {
 
 /// Обслуживает процесс тестирования.
 fn start_test(test_name: String) {
-    let request = Request {
-        user: whoami::username(),
-        test: test_name.clone(),
-        command: Command::StartTest,
-    };
+    let request = Request::new(whoami::username(), test_name.clone(), Command::StartTest);
 
     match send_request(&request) {
         Ok(response) => match response {
@@ -63,7 +59,7 @@ fn start_test(test_name: String) {
                 println!("Тест завершен. Ваш результат: {}", result);
             }
 
-            _ => eprintln!("Ошибка запуска теста."),
+            _ => eprintln!("Теста не существует или доступ к нему закрыт."),
         },
         Err(err) => eprintln!("Ошибка связи с сервером: {}", err.to_string()),
     }
@@ -90,11 +86,11 @@ fn ask_yes() -> bool {
 }
 
 fn run_test(test_name: String, next_question: Option<Response>) {
-    let next_question_request = Request {
-        user: whoami::username(),
-        test: test_name.clone(),
-        command: Command::GetNextQuestion,
-    };
+    let next_question_request = Request::new(
+        whoami::username(),
+        test_name.clone(),
+        Command::GetNextQuestion,
+    );
 
     let mut next_question = next_question;
     loop {
@@ -109,11 +105,11 @@ fn run_test(test_name: String, next_question: Option<Response>) {
         match response {
             Ok(Response::NextQuestion { question, answers }) => {
                 let answers = ask_question(question, answers);
-                let put_answer_request = Request {
-                    user: whoami::username(),
-                    test: test_name.clone(),
-                    command: Command::PutAnswer { answer: answers },
-                };
+                let put_answer_request = Request::new(
+                    whoami::username(),
+                    test_name.clone(),
+                    Command::PutAnswer { answer: answers },
+                );
 
                 match send_request(&put_answer_request) {
                     Ok(Response::End { result }) => {
@@ -187,11 +183,11 @@ fn ask_string() -> String {
 
 /// Выводит перечень тестов.
 fn print_avaliable_tests() {
-    let request = Request {
-        user: whoami::username(),
-        test: "".to_string(),
-        command: Command::GetAvaliableTests,
-    };
+    let request = Request::new(
+        whoami::username(),
+        "".to_string(),
+        Command::GetAvaliableTests,
+    );
 
     match send_request(&request) {
         Ok(response) => match response {

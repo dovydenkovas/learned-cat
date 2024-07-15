@@ -16,7 +16,6 @@ pub mod init;
 pub mod parsetest;
 use errors::{ModelError, ModelResult};
 use parsetest::read_test;
-use whoami::username;
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct Question {
@@ -76,7 +75,7 @@ pub struct Variant {
     pub timestamp: Option<chrono::DateTime<chrono::Local>>,
     questions: Vec<Question>,
     answers: Vec<Vec<usize>>,
-    current_question: usize,
+    current_question: Option<usize>,
     pub result: Option<usize>,
 }
 
@@ -261,7 +260,7 @@ impl Model {
             timestamp: None,
             questions,
             answers: vec![],
-            current_question: 0,
+            current_question: None,
             result: None,
         })
     }
@@ -358,18 +357,26 @@ impl Model {
             variant.timestamp = Some(chrono::offset::Local::now());
         }
 
-        let id = variant.current_question;
-        return Ok(variant.questions[id].clone());
+        let mut id = variant.current_question;
+        if variant.current_question.is_none() {
+            variant.current_question = Some(0);
+            id = Some(0);
+        }
+        return Ok(variant.questions[id.unwrap()].clone());
     }
 
     pub fn is_next_question(&self, username: &String, testname: &String) -> ModelResult<bool> {
         let result_mark = username.to_owned() + "@" + &testname;
         if self.results.contains_key(&result_mark) {
-            Ok(self.results[&result_mark]
+            let current_question = self.results[&result_mark]
                 .variants
                 .last()
                 .unwrap()
-                .current_question
+                .current_question;
+            if current_question.is_none() {
+                return Ok(true);
+            }
+            Ok(current_question.unwrap()
                 < self.results[&result_mark]
                     .variants
                     .last()
@@ -398,8 +405,11 @@ impl Model {
                 .unwrap();
             if variant.result.is_none() {
                 variant.answers.push(answer.clone());
-                variant.current_question += 1;
-                if variant.current_question == variant.questions.len() {
+                if variant.current_question.is_none() {
+                    return Err(ModelError::TestNotStarted);
+                }
+                variant.current_question = Some(variant.current_question.unwrap() + 1);
+                if variant.current_question.unwrap() == variant.questions.len() {
                     self.done_test(username, testname)
                 }
                 return Ok(());
@@ -412,12 +422,18 @@ impl Model {
     fn get_result(&self, username: &String, test: &Test) -> ModelResult<String> {
         let result_mark = username.to_owned() + "@" + &test.caption;
         if self.results.contains_key(&result_mark) {
-            let mut result = 0;
+            let mut result = String::new();
+            let mut best_mark = 0;
             let mut has_result = false;
             for variant in &self.results[&result_mark].variants {
                 match variant.result {
                     Some(res) => {
-                        result = std::cmp::max(result, res);
+                        if test.show_results {
+                            best_mark = std::cmp::max(best_mark, res);
+                            result = best_mark.to_string();
+                        } else {
+                            result = "Тест завершен.".to_string();
+                        }
                         has_result = true;
                     }
                     None => (),
@@ -462,7 +478,7 @@ impl Model {
                 .last_mut()
                 .unwrap();
             let mut result = 0;
-            for i in 0..variant.answers.len() {
+            for i in 0..variant.questions.len() {
                 variant.answers[i].sort();
                 if variant.questions[i].correct_answers == variant.answers[i] {
                     result += 1;
@@ -578,4 +594,39 @@ fn set_daemon_dir<P: AsRef<Path>>(path: P) -> Result<(), Box<dyn Error>> {
         return Err(Box::new(std::fmt::Error));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_daemon_dir_test() {
+        // TODO
+    }
+
+    #[test]
+    fn test_collector_test() {
+        // TODO
+    }
+
+    #[test]
+    fn read_settings_test() {
+        // TODO
+    }
+
+    #[test]
+    fn calculate_mark_test() {
+        // TODO
+    }
+
+    #[test]
+    fn put_answer() {
+        // TODO
+    }
+
+    #[test]
+    fn get_next_question() {
+        // TODO
+    }
 }
