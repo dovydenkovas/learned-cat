@@ -38,7 +38,11 @@ fn main() {
 
 /// Обслуживает процесс тестирования.
 fn start_test(test_name: String) {
-    let request = Request::new(whoami::username(), test_name.clone(), Command::StartTest);
+    let request = Request::new(
+        whoami::username(),
+        test_name.clone(),
+        Command::GetNextQuestion,
+    );
 
     match send_request(&request) {
         Ok(response) => match response {
