@@ -40,7 +40,7 @@ pub struct Test {
     pub questions_number: usize,
 
     #[serde(default)]
-    pub test_duration_minutes: i64,
+    pub test_duration_seconds: i64,
 
     #[serde(default)]
     pub number_of_attempts: usize,
@@ -60,7 +60,7 @@ impl std::default::Default for Test {
             banner: "".to_string(),
             questions: vec![],
             questions_number: 0,
-            test_duration_minutes: 0,
+            test_duration_seconds: 0,
             show_results: true,
             allowed_users: vec![],
             number_of_attempts: 1,
@@ -103,6 +103,9 @@ pub struct Settings {
 
     #[serde(default)]
     pub new_file_permissions: u32,
+
+    #[serde(default)]
+    pub verifier_interval_seconds: u64,
 }
 
 impl std::default::Default for Settings {
@@ -113,6 +116,7 @@ impl std::default::Default for Settings {
             server_address: "127.0.0.1:65001".to_string(),
             tests: vec![],
             new_file_permissions: 0o640,
+            verifier_interval_seconds: 5,
         }
     }
 }
@@ -157,7 +161,7 @@ impl Model {
         }));
 
         let arc_model = Arc::clone(&model);
-        std::thread::spawn(|| test_collector(arc_model));
+        std::thread::spawn(move || test_collector(arc_model, settings.verifier_interval_seconds));
 
         model
     }
@@ -312,7 +316,7 @@ impl Model {
             }
 
             if (chrono::Local::now() - variant.timestamp.unwrap())
-                > chrono::Duration::new(test.test_duration_minutes * 60, 0).unwrap()
+                > chrono::Duration::new(test.test_duration_seconds, 0).unwrap()
             {
                 return Ok(true);
             }
@@ -478,7 +482,10 @@ impl Model {
                 .last_mut()
                 .unwrap();
             let mut result = 0;
-            for i in 0..variant.questions.len() {
+            for i in 0..variant.answers.len() {
+                if i >= variant.questions.len() {
+                    break;
+                }
                 variant.answers[i].sort();
                 if variant.questions[i].correct_answers == variant.answers[i] {
                     result += 1;
@@ -548,7 +555,7 @@ pub fn load_results<P: AsRef<Path>>(result_path: P) -> TestResults {
     results
 }
 
-fn test_collector(model: Arc<Mutex<Model>>) {
+fn test_collector(model: Arc<Mutex<Model>>, verifier_interval_seconds: u64) {
     loop {
         {
             println!("Проверка завершения времени тестирования");
@@ -573,7 +580,7 @@ fn test_collector(model: Arc<Mutex<Model>>) {
                 model.lock().unwrap().done_test(&username, &testname);
             }
         }
-        std::thread::sleep(std::time::Duration::from_secs(30));
+        std::thread::sleep(std::time::Duration::from_secs(verifier_interval_seconds));
     }
 }
 
