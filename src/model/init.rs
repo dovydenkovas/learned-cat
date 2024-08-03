@@ -65,7 +65,16 @@ fn create_settings(dir_path: &Path) {
     if path.exists() {
         return;
     }
-    let example_settings = r#"tests_directory_path = "tests" # Путь к каталогу с файлами тестов
+    let example_settings = get_default_settings();
+    let mut file = File::create(&path).expect("Ошибка создания файла настоек");
+    file.write(example_settings.as_bytes())
+        .expect("Ошибка сохранения файла настроек");
+
+    chmod(path.as_path(), FILE_PERMISSIONS);
+}
+
+fn get_default_settings() -> String {
+    r#"tests_directory_path = "tests" # Путь к каталогу с файлами тестов
 result_path = "results" # Путь к каталогу где должны храниться результаты тестирования
 server_address = "127.0.0.1:65001" # Адрес сервера тестирования.
 new_file_permissions = 0o644 # Права доступа файла результата (0o - спецификатор восьмиричной системы счисления)
@@ -86,13 +95,7 @@ test_duration_seconds = 1
 show_results = false
 allowed_users = ["student2"]
 number_of_attempts = 0
-"#;
-
-    let mut file = File::create(&path).expect("Ошибка создания файла настоек");
-    file.write(example_settings.as_bytes())
-        .expect("Ошибка сохранения файла настроек");
-
-    chmod(path.as_path(), FILE_PERMISSIONS);
+"#.to_string()
 }
 
 fn create_example_tests(dir_path: &Path) {

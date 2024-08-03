@@ -104,7 +104,7 @@ pub fn read_test(path: &Path, test: &mut Test) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    /*
     #[test]
     fn parsetest_few_questions_test() {
         // TODO
@@ -128,5 +128,5 @@ mod tests {
     #[test]
     fn parsetest_parse_error_test() {
         // TODO
-    }
+        }*/
 }

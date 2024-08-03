@@ -17,14 +17,14 @@ pub mod parsetest;
 use errors::{ModelError, ModelResult};
 use parsetest::read_test;
 
-#[derive(Debug, Deserialize, Clone, Serialize)]
+#[derive(Debug, Deserialize, Clone, Serialize, PartialEq)]
 pub struct Question {
     pub question: String,
     pub answers: Vec<String>,
     pub correct_answers: Vec<usize>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 pub struct Test {
     /// Basic info
     pub caption: String,
@@ -86,37 +86,63 @@ pub struct Variants {
 
 type TestResults = std::collections::hash_map::HashMap<String, Variants>;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, PartialEq)]
 pub struct Settings {
-    #[serde(default)]
+    #[serde(default = "Settings::default_tests_directory_path")]
     pub tests_directory_path: String,
 
-    #[serde(default)]
+    #[serde(default = "Settings::default_result_path")]
     pub result_path: String,
 
-    #[serde(default)]
+    #[serde(default = "Settings::default_server_address")]
     pub server_address: String,
 
-    #[serde(default)]
+    #[serde(default = "Settings::default_tests")]
     #[serde(rename = "test")]
     pub tests: Vec<Test>,
 
-    #[serde(default)]
+    #[serde(default = "Settings::default_new_file_permissions")]
     pub new_file_permissions: u32,
 
-    #[serde(default)]
+    #[serde(default = "Settings::default_verifier_interval_seconds")]
     pub verifier_interval_seconds: u64,
+}
+
+impl Settings {
+    fn default_tests_directory_path() -> String {
+        "tests".to_string()
+    }
+
+    fn default_result_path() -> String {
+        "results".to_string()
+    }
+
+    fn default_server_address() -> String {
+        "127.0.0.1:65001".to_string()
+    }
+
+    fn default_tests() -> Vec<Test> {
+        vec![]
+    }
+
+    fn default_new_file_permissions() -> u32 {
+        0o640
+    }
+
+    fn default_verifier_interval_seconds() -> u64 {
+        5
+    }
 }
 
 impl std::default::Default for Settings {
     fn default() -> Settings {
         Settings {
-            tests_directory_path: "tests".to_string(),
-            result_path: "results".to_string(),
-            server_address: "127.0.0.1:65001".to_string(),
-            tests: vec![],
-            new_file_permissions: 0o640,
-            verifier_interval_seconds: 5,
+            tests_directory_path: Settings::default_tests_directory_path(),
+            result_path: Settings::default_result_path(),
+            server_address: Settings::default_server_address(),
+            tests: Settings::default_tests(),
+            new_file_permissions: Settings::default_new_file_permissions(),
+            verifier_interval_seconds: Settings::default_verifier_interval_seconds(),
         }
     }
 }
@@ -605,23 +631,119 @@ fn set_daemon_dir<P: AsRef<Path>>(path: P) -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{read_settings, Model};
+    use crate::{
+        get_daemon_dir_path,
+        model::{init::init_server, Settings, Test},
+    };
+    use std::{
+        io::Write,
+        sync::{Arc, Mutex},
+    };
+
+    fn free_resource<S: AsRef<str>>(name: S) {
+        let dir = std::env::temp_dir();
+        let path = dir.join(name.as_ref());
+        let _ = std::fs::remove_dir_all(&path);
+    }
+
+    fn get_test_model<S: AsRef<str>>(name: S) -> Arc<Mutex<Model>> {
+        let dir = std::env::temp_dir();
+        let path = dir.join(name.as_ref());
+        init_server(&path);
+        let settings = read_settings(&path).unwrap();
+
+        Model::begin(settings, path)
+    }
+
+    /*fn new_tempfile<S: AsRef<str>>(content: S) -> std::path::PathBuf {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!(
+            "{}",
+            std::time::Instant::now().elapsed().as_nanos()
+        ));
+        let mut file = std::fs::File::create_new(&path).unwrap();
+        file.write(content.as_ref().as_bytes());
+        path
+    }
+
+    fn rm_tempfile<S: AsRef<str>>(path: S) {
+    std::fs::remove_file(std::path::Path::new(path.as_ref())).unwrap();
+    }*/
 
     #[test]
     fn get_daemon_dir_test() {
-        // TODO
+        assert_eq!(
+            get_daemon_dir_path(),
+            std::path::Path::new("/opt/learned-cat/")
+        );
+
+        std::env::set_var("LEARNED_CAT_PATH", "/usr/share/lc");
+
+        assert_eq!(get_daemon_dir_path(), std::path::Path::new("/usr/share/lc"));
     }
 
-    #[test]
+    /*#[test]
     fn test_collector_test() {
+        // test_collector(model, verifier_interval_seconds)
         // TODO
-    }
+        }*/
 
     #[test]
     fn read_settings_test() {
-        // TODO
-    }
+        assert!(read_settings("qwerty").is_err());
+        assert!(read_settings("").is_err());
+        assert!(read_settings("/etc/passwd").is_err());
 
+        let model = get_test_model("model-settings");
+        let settings_path = std::env::temp_dir().join("model-settings");
+        let settings = read_settings(&settings_path).unwrap();
+
+        assert_eq!(
+            Settings {
+                tests_directory_path: "tests".to_string(),
+                result_path: "results".to_string(),
+                server_address: "127.0.0.1:65001".to_string(),
+                tests: vec![
+                    Test {
+                        caption: "linux".to_string(),
+                        banner: "".to_string(),
+                        questions: vec![],
+                        questions_number: 1,
+                        test_duration_seconds: 5,
+                        number_of_attempts: 1,
+                        show_results: true,
+                        allowed_users: vec!["student1".to_string(), "student2".to_string()]
+                    },
+                    Test {
+                        caption: "python".to_string(),
+                        banner: "".to_string(),
+                        questions: vec![],
+                        questions_number: 2,
+                        test_duration_seconds: 1,
+                        number_of_attempts: 0,
+                        show_results: false,
+                        allowed_users: vec!["student2".to_string()]
+                    }
+                ],
+                new_file_permissions: 420,
+                verifier_interval_seconds: 1
+            },
+            settings,
+            "Несоответсвие параметров конфига значениям по умолчанию"
+        );
+
+        let mut file = std::fs::File::create(&settings_path.join("settings.toml")).unwrap();
+        file.write_all(b"[wrong] \nwrong = 42").unwrap();
+        file.flush().unwrap();
+        drop(file);
+        let settings = read_settings(settings_path).unwrap();
+        assert_eq!(Settings::default(), settings);
+
+        drop(model);
+        free_resource("model-settings");
+    }
+    /*
     #[test]
     fn calculate_mark_test() {
         // TODO
@@ -635,5 +757,5 @@ mod tests {
     #[test]
     fn get_next_question() {
         // TODO
-    }
+        }*/
 }

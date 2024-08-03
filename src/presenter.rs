@@ -133,9 +133,12 @@ impl Presenter {
 
 #[cfg(test)]
 mod tests {
-    use crate::model::{init, read_settings};
+    use crate::{
+        model::{init, read_settings},
+        network::{Command, Request, Response},
+    };
 
-    use super::*;
+    use super::Presenter;
 
     fn free_resource<S: AsRef<str>>(name: S) {
         let dir = std::env::temp_dir();
