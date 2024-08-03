@@ -46,7 +46,7 @@ impl Presenter {
         }
 
         let response = match request.command {
-            Command::StartTest | Command::GetNextQuestion => {
+            Command::GetNextQuestion => {
                 let res = self
                     .model
                     .lock()
@@ -199,27 +199,27 @@ mod tests {
         let mut presenter = get_test_presenter("test_scst");
 
         // not exist test
-        let req = Request::new("student1", "fake_test", Command::StartTest);
+        let req = Request::new("student1", "fake_test", Command::GetNextQuestion);
         assert_eq!(presenter.serve_connection(req), Response::NotAllowedUser);
 
         // not allowed user
-        let req = Request::new("cat_user", "linux", Command::StartTest);
+        let req = Request::new("cat_user", "linux", Command::GetNextQuestion);
         assert_eq!(presenter.serve_connection(req), Response::NotAllowedUser);
 
         // new user
-        let req = Request::new("student1", "linux", Command::StartTest);
+        let req = Request::new("student1", "linux", Command::GetNextQuestion);
         assert!(matches!(
             presenter.serve_connection(req),
             Response::TestStarted { .. }
         ));
 
         // test is running
-        let req = Request::new("student1", "linux", Command::StartTest);
+        let req = Request::new("student1", "linux", Command::GetNextQuestion);
 
         presenter.serve_connection(req);
         let req = Request::new("student1", "linux", Command::GetNextQuestion);
         presenter.serve_connection(req);
-        let req = Request::new("student1", "linux", Command::StartTest);
+        let req = Request::new("student1", "linux", Command::GetNextQuestion);
         assert!(matches!(
             presenter.serve_connection(req),
             Response::NextQuestion { .. }
@@ -228,7 +228,7 @@ mod tests {
         // test is done
         let req = Request::new("student1", "linux", Command::PutAnswer { answer: vec![0] });
         presenter.serve_connection(req);
-        let req = Request::new("student1", "linux", Command::StartTest);
+        let req = Request::new("student1", "linux", Command::GetNextQuestion);
         assert_eq!(
             presenter.serve_connection(req),
             Response::End {
@@ -276,13 +276,13 @@ mod tests {
         assert_eq!(presenter.serve_connection(req), Response::ServerError);
 
         // test is started
-        let req = Request::new("student1", "linux", Command::StartTest);
+        let req = Request::new("student1", "linux", Command::GetNextQuestion);
         presenter.serve_connection(req);
         let req = Request::new("student1", "linux", Command::PutAnswer { answer: vec![0] });
         assert_eq!(presenter.serve_connection(req), Response::ServerError);
 
         // test is running
-        let req = Request::new("student1", "linux", Command::StartTest);
+        let req = Request::new("student1", "linux", Command::GetNextQuestion);
         presenter.serve_connection(req);
         let req = Request::new("student1", "linux", Command::GetNextQuestion);
         presenter.serve_connection(req);

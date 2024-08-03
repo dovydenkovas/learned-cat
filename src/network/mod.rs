@@ -49,7 +49,6 @@ impl Request {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Command {
     GetAvaliableTests,
-    StartTest,
     GetNextQuestion,
     PutAnswer { answer: Vec<usize> },
 }
