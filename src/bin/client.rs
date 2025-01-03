@@ -8,8 +8,7 @@ use clap::Parser;
 use rustyline::DefaultEditor;
 use whoami;
 
-mod network;
-use network::{Command, Request, Response};
+use learned_cat::network::{Command, Request, Response};
 
 /// Структура аргументов командной строки.
 #[derive(Parser)]

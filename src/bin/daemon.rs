@@ -1,15 +1,13 @@
-use crate::model::Settings;
+use learned_cat::examiner::Settings;
 use clap::arg;
 use std::error::Error;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 
-mod network;
-use network::Request;
-mod presenter;
-use presenter::Presenter;
-mod model;
+use learned_cat::network::Request;
+use learned_cat::presenter::Presenter;
+use learned_cat::examiner::{init, read_settings, load_results};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = get_arguments();
@@ -17,14 +15,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let root_path = get_daemon_dir_path();
     match arguments.subcommand() {
         Some(("init", _)) => {
-            model::init::init_server(&root_path)
+            init::init_server(&root_path)
         },
         Some(("run", _)) => {
-            let settings = model::read_settings(&root_path)?;
+            let settings = read_settings(&root_path)?;
             start_server(settings, root_path)?
         },
         Some(("export-results", args)) => {
-            let settings = model::read_settings(&root_path)?;
+            let settings = read_settings(&root_path)?;
             export_results(
             settings.result_path,
             args.get_one::<String>("filename")
@@ -52,7 +50,7 @@ fn export_results<P: AsRef<Path>>(
     root_path: P,
 ) -> Result<(), Box<dyn Error>> {
     let result_path = root_path.as_ref().join(results_filename);
-    let results = model::load_results(&result_path);
+    let results = load_results(&result_path);
     let mut file = match std::fs::File::create(output_filename.clone()) {
         Ok(v) => v,
         Err(err) => {

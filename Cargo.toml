@@ -15,11 +15,12 @@ rand = "0.8.5"
 walkdir = "2.5.0"
 rustyline = "14.0.0"
 
+[lib]
 
 [[bin]]
 name = "learned-cat-daemon"
-path = "src/daemon.rs"
+path = "src/bin/daemon.rs"
 
 [[bin]]
 name = "learned-cat"
-path = "src/client.rs"
+path = "src/bin/client.rs"

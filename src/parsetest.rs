@@ -3,7 +3,7 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::Path;
 
-use crate::model::{Question, Test};
+use crate::examiner::{Question, Test};
 
 enum ParseState {
     TestBanner,
