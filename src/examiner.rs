@@ -11,11 +11,9 @@ use serde::{Deserialize, Serialize};
 use toml::from_str as from_toml;
 use walkdir::WalkDir;
 
-pub mod errors;
-pub mod init;
-pub mod parsetest;
-use errors::{ModelError, ModelResult};
-use parsetest::read_test;
+use crate::errors::{ModelError, ModelResult};
+use crate::parsetest::read_test;
+pub use crate::init;
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct Question {

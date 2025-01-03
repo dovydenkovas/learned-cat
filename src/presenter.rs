@@ -1,5 +1,5 @@
-use crate::model::errors::{ModelError, ModelResult};
-use crate::model::{Model, Settings};
+use crate::errors::{ModelError, ModelResult};
+use crate::examiner::{Model, Settings};
 use crate::network::{Command, Request, Response};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
