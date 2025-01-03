@@ -3,7 +3,7 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::Path;
 
-use crate::examiner::{Question, Test};
+use crate::examiner::{Question, TestSettings};
 
 enum ParseState {
     TestBanner,
@@ -12,7 +12,7 @@ enum ParseState {
 }
 
 /// Парсит Markdown файл тестирования
-pub fn read_test(path: &Path, test: &mut Test) {
+pub fn read_test(path: &Path, test: &mut TestSettings) {
     let file = File::open(path).expect(format!("Не могу открыть файл теста: {:?}", path).as_str());
     let file = BufReader::new(file);
 

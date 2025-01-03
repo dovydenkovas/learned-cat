@@ -12,8 +12,8 @@ use toml::from_str as from_toml;
 use walkdir::WalkDir;
 
 use crate::errors::{ModelError, ModelResult};
-use crate::parsetest::read_test;
 pub use crate::init;
+use crate::parsetest::read_test;
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct Question {
@@ -22,8 +22,13 @@ pub struct Question {
     pub correct_answers: Vec<usize>,
 }
 
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct Answer {
+    pub answers: Vec<usize>,
+}
+
 #[derive(Debug, Deserialize)]
-pub struct Test {
+pub struct TestSettings {
     /// Basic info
     pub caption: String,
 
@@ -51,9 +56,9 @@ pub struct Test {
     pub allowed_users: Vec<String>,
 }
 
-impl std::default::Default for Test {
-    fn default() -> Test {
-        Test {
+impl std::default::Default for TestSettings {
+    fn default() -> TestSettings {
+        TestSettings {
             caption: "".to_string(),
             banner: "".to_string(),
             questions: vec![],
@@ -97,7 +102,7 @@ pub struct Settings {
 
     #[serde(default)]
     #[serde(rename = "test")]
-    pub tests: Vec<Test>,
+    pub tests: Vec<TestSettings>,
 
     #[serde(default)]
     pub new_file_permissions: u32,
@@ -119,7 +124,7 @@ impl std::default::Default for Settings {
 pub struct Model {
     result_path: PathBuf,
     server_address: String,
-    tests: HashMap<String, Test>,
+    tests: HashMap<String, TestSettings>,
     results: TestResults,
     new_file_permissions: u32,
     root_path: PathBuf,
@@ -132,7 +137,7 @@ impl Model {
 
         // Read tests
         let quests_base_path = Path::new(&settings.tests_directory_path);
-        let mut tests: HashMap<String, Test> = HashMap::new();
+        let mut tests: HashMap<String, TestSettings> = HashMap::new();
         for mut test in settings.tests {
             let path = quests_base_path.join(Path::new(&(test.caption.to_owned() + ".md")));
             read_test(&path, &mut test);
@@ -168,7 +173,7 @@ impl Model {
         Ok(self
             .tests
             .get(testname)
-            .unwrap_or(&Test::default())
+            .unwrap_or(&TestSettings::default())
             .banner
             .clone())
     }
@@ -417,7 +422,7 @@ impl Model {
         Err(ModelError::VariantNotExist(result_mark.clone()))
     }
 
-    fn get_result(&self, username: &String, test: &Test) -> ModelResult<String> {
+    fn get_result(&self, username: &String, test: &TestSettings) -> ModelResult<String> {
         let result_mark = username.to_owned() + "@" + &test.caption;
         if self.results.contains_key(&result_mark) {
             let mut result = String::new();
