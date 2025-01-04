@@ -1,13 +1,12 @@
-use learned_cat::examiner::Settings;
+#![allow(unused)]
 use clap::arg;
+use learned_cat::examiner::Examiner;
+use std::env::set_current_dir;
 use std::error::Error;
-use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 
-use learned_cat::network::Request;
-use learned_cat::presenter::Presenter;
-use learned_cat::examiner::{init, read_settings, load_results};
+use learned_cat::init;
+use learned_cat::settings::{read_settings, Settings};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = get_arguments();
@@ -22,15 +21,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             start_server(settings, root_path)?
         },
         Some(("export-results", args)) => {
-            let settings = read_settings(&root_path)?;
-            export_results(
-            settings.result_path,
-            args.get_one::<String>("filename")
-                .or(Some(&"output.csv".to_string()))
-                .unwrap()
-                .to_string(),
-            &root_path,
-            )?
+            // TODO!
+            // let settings = read_settings(&root_path)?;
+            // export_results(
+            // settings.result_path,
+            // args.get_one::<String>("filename")
+            //     .or(Some(&"output.csv".to_string()))
+            //     .unwrap()
+            //     .to_string(),
+            // &root_path,
+            // )?
         },
         Some((&_, _)) => eprintln!("Неизвестная команда."),
         None => eprintln!("Необходимо указать команду. Для просмотра доступных кооманд используйте переметр --help"),
@@ -38,9 +38,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn start_server<P: AsRef<Path>>(settings: Settings, path: P) -> Result<(), Box<dyn Error>> {
-    let mut presenter: Presenter = Presenter::new(settings, path);
-    server_mainloop(&mut presenter);
+fn start_server(settings: Settings, path: PathBuf) -> Result<(), Box<dyn Error>> {
+    let tests_path = Path::new(&path).join(&settings.tests_directory_path);
+
+    let database = learned_cat::database::TestDatabase::new(&settings, tests_path);
+    let server = learned_cat::server::SocketServer::new(settings.server_address.clone());
+    set_daemon_dir(&path).expect("Error init and start server");
+    let _ = Examiner::new(Box::new(database), Box::new(server));
     Ok(())
 }
 
@@ -49,6 +53,7 @@ fn export_results<P: AsRef<Path>>(
     output_filename: String,
     root_path: P,
 ) -> Result<(), Box<dyn Error>> {
+    /*
     let result_path = root_path.as_ref().join(results_filename);
     let results = load_results(&result_path);
     let mut file = match std::fs::File::create(output_filename.clone()) {
@@ -75,7 +80,7 @@ fn export_results<P: AsRef<Path>>(
                 let _ = file.write(out.as_bytes());
             }
         }
-    }
+    }*/
     Ok(())
 }
 
@@ -109,43 +114,21 @@ fn get_arguments() -> clap::ArgMatches {
         .get_matches()
 }
 
-/// Open listener and run mainloop
-fn server_mainloop(presenter: &mut Presenter) {
-    let address = presenter.model.lock().unwrap().get_server_address();
-    println!("* Открываю порт сервера: {}", address);
-    let listener = TcpListener::bind(address).expect("Не могу открыть соединение");
-
-    println!("* Запускаю главный цикл\n");
-    loop {
-        for stream in listener.incoming() {
-            match stream {
-                Ok(mut stream) => match handle_client(&mut stream, presenter) {
-                    Ok(()) => (),
-                    Err(err) => eprintln!("{err:?}"),
-                },
-                Err(err) => eprintln!("{err:?}"),
-            }
-        }
-    }
-}
-
-fn handle_client(stream: &mut TcpStream, presenter: &mut Presenter) -> Result<(), Box<dyn Error>> {
-    let mut request = [0 as u8; 5000];
-    let n_bytes = stream.read(&mut request)?;
-    let request = bincode::deserialize::<Request>(&request[0..n_bytes])?;
-
-    print!("[{}] {:?} -> ", chrono::Utc::now(), request);
-    let response = presenter.serve_connection(request);
-    println!("{:?}", response);
-    let response = bincode::serialize(&response)?;
-
-    stream.write(&response)?;
-    Ok(())
-}
-
 fn get_daemon_dir_path() -> PathBuf {
     match std::env::var("LEARNED_CAT_PATH") {
         Ok(v) => PathBuf::from(v),
         Err(_) => PathBuf::from("/opt/learned-cat"),
     }
+}
+
+fn set_daemon_dir<P: AsRef<Path>>(path: P) -> Result<(), Box<dyn Error>> {
+    if set_current_dir(path.as_ref()).is_err() {
+        eprintln!(
+            "Ошибка доступа к каталогу сервера {}.",
+            path.as_ref().to_str().unwrap()
+        );
+        eprintln!("Проверьте, что каталог существует, и у процесса есть у нему доступ.");
+        return Err(Box::new(std::fmt::Error));
+    }
+    Ok(())
 }

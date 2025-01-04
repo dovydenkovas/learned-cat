@@ -1,50 +1,56 @@
-use examiner::{Answer, Question, TestSettings};
-
-pub mod errors;
+pub mod database;
 pub mod examiner;
 pub mod init;
 pub mod network;
 pub mod parsetest;
-pub mod presenter;
+pub mod schema;
+pub mod server;
+pub mod settings;
+
+use schema::{Answer, Question};
+use settings::TestSettings;
 
 /// Интерфейс взаимодействия Сервера и Экзаменатора.
-trait Server {
+pub trait Server {
     /// Взять запрос из очереди запроса.
-    fn pop_request(&mut self) -> network::Request;
+    fn pop_request(&mut self) -> Option<network::Request>;
 
     /// Отправить ответ на запрос.
     fn push_response(&mut self, response: network::Response);
 }
 
 /// Интерфейс взаимодействия Экзаменатора с Базой данных.
-trait Database {
+pub trait Database {
     /// Проверить валидность пользователя username.
-    fn has_user(username: String) -> bool;
+    fn has_user(&self, username: &String) -> bool;
 
     /// Проверить валидность теста testname.
-    fn has_test(testname: String) -> bool;
+    fn has_test(&self, testname: &String) -> bool;
 
     /// Проверить доступность теста testname для пользователя username.
-    fn has_access(username: String, testname: String) -> bool;
+    fn has_access(&self, username: &String, testname: &String) -> bool;
 
     /// Сколько попыток для прохождения теста testname осталось у пользователя username.
-    fn remaining_attempts_number(username: String, testname: String) -> u32;
+    fn remaining_attempts_number(&self, username: &String, testname: &String) -> u32;
 
     /// Получить список тестов, доступных пользователю username.
-    fn user_tests_list(username: String) -> Vec<String>;
+    fn user_tests_list(&self, username: &String) -> Vec<(String, String)>;
 
     /// Получить параметры теста testname.
-    fn test_settings(testname: String) -> TestSettings;
+    fn test_settings(&self, testname: &String) -> TestSettings;
+
+    /// Получить описание теста.
+    fn test_banner(&self, testname: &String) -> String;
 
     /// Получить текст вопроса question_id теста testname.
-    fn question(testname: String, question_id: u64) -> Question;
+    fn question(&self, testname: &String, question_id: u64) -> Question;
 
     /// Получить ответы на вопрос question_id теста testname.
-    fn answer(testname: String, question_id: u64) -> Answer;
+    fn answer(&self, testname: &String, question_id: u64) -> Answer;
 
     /// Получить баллы за тест testname для пользователя username.
-    fn mark(username: String, testname: String) -> Vec<f32>;
+    fn mark(&self, username: &String, testname: &String) -> Vec<f32>;
 
     /// Сохранить баллы за тест testname для пользователя username.
-    fn add_mark(username: String, testname: String, mark: f32);
+    fn add_mark(&self, username: &String, testname: &String, mark: f32);
 }

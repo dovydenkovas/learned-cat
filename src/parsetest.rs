@@ -3,7 +3,8 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::Path;
 
-use crate::examiner::{Question, TestSettings};
+use crate::schema::Question;
+use crate::settings::TestSettings;
 
 enum ParseState {
     TestBanner,
@@ -99,34 +100,4 @@ pub fn read_test(path: &Path, test: &mut TestSettings) {
 
     test.banner = banner;
     test.questions = questions;
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parsetest_few_questions_test() {
-        // TODO
-    }
-
-    #[test]
-    fn parsetest_one_answer_test() {
-        // TODO
-    }
-
-    #[test]
-    fn parsetest_few_answers_test() {
-        // TODO
-    }
-
-    #[test]
-    fn parsetest_open_questions_test() {
-        // TODO
-    }
-
-    #[test]
-    fn parsetest_parse_error_test() {
-        // TODO
-    }
 }

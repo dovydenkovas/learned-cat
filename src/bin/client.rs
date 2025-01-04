@@ -55,7 +55,7 @@ fn start_test(test_name: String) {
             ),
 
             Response::End { result } => {
-                println!("Тест завершен. Ваш результат: {}", result);
+                println!("Тест завершен. Ваш результат: {:?}", result);
             }
 
             _ => eprintln!("Теста не существует или доступ к нему закрыт."),
@@ -112,7 +112,7 @@ fn run_test(test_name: String, next_question: Option<Response>) {
 
                 match send_request(&put_answer_request) {
                     Ok(Response::End { result }) => {
-                        println!("Тест завершен. Ваш результат: {}", result);
+                        println!("Тест завершен. Ваш результат: {:?}", result);
                         break;
                     }
 
@@ -121,7 +121,7 @@ fn run_test(test_name: String, next_question: Option<Response>) {
             }
 
             Ok(Response::End { result }) => {
-                println!("Тест завершен. Ваш результат: {}", result);
+                println!("Тест завершен. Ваш результат: {:?}", result);
                 break;
             }
 

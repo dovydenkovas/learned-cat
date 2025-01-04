@@ -16,8 +16,10 @@ const FILE_PERMISSIONS: u32 = 0o640;
 /// # Examples
 ///
 /// ```
-/// chmod("/opt/example", 0o770);
-/// chmod("settings.toml", 0o664);
+/// use learned_cat::init::chmod;
+/// use std::path::Path;
+///
+/// chmod(Path::new("README.md"), 0o664);
 /// ```
 pub fn chmod(path: &Path, mode: u32) {
     let file = File::open(path).expect("Ошибка доступа к корневой дирректории");

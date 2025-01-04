@@ -68,7 +68,7 @@ pub enum Response {
     },
     Ok,
     End {
-        result: String,
+        result: Vec<f32>,
     },
     NotAllowedUser,
     ServerError,
