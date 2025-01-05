@@ -3,7 +3,7 @@ use std::{
     net::{TcpListener, TcpStream},
 };
 
-use crate::{
+use learned_cat_interfaces::{
     network::{self, Request},
     Server,
 };

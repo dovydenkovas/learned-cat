@@ -6,7 +6,7 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use learned_cat::init;
-use learned_cat::settings::{read_settings, Settings};
+use learned_cat_interfaces::settings::{read_settings, Settings};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = get_arguments();
