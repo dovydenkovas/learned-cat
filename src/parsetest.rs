@@ -3,8 +3,8 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::Path;
 
-use crate::schema::Question;
-use crate::settings::TestSettings;
+use learned_cat_interfaces::schema::Question;
+use learned_cat_interfaces::settings::TestSettings;
 
 enum ParseState {
     TestBanner,

@@ -3,12 +3,12 @@ use std::collections::HashMap;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
-use crate::schema::Variant;
-use crate::{
+use learned_cat_interfaces::schema::Variant;
+use learned_cat_interfaces::{
     network::{Command, Response},
     schema::Question,
 };
-use crate::{Database, Server};
+use learned_cat_interfaces::{Database, Server};
 
 pub struct Examiner {
     db: Box<dyn Database>,
@@ -75,7 +75,7 @@ impl Examiner {
             Response::Ok
         } else {
             Response::End {
-                result: self.db.mark(username, testname),
+                result: self.db.marks(username, testname),
             }
         }
     }
@@ -88,7 +88,7 @@ impl Examiner {
 
         if self.db.remaining_attempts_number(username, testname) <= 0 {
             return Response::End {
-                result: self.db.mark(username, testname),
+                result: self.db.marks(username, testname),
             };
         }
 
@@ -96,7 +96,7 @@ impl Examiner {
             if self.is_test_time_is_over(username, testname) {
                 self.done_test(username, testname);
                 return Response::End {
-                    result: self.db.mark(username, testname),
+                    result: self.db.marks(username, testname),
                 };
             } else {
                 return self.get_next_question(username);
