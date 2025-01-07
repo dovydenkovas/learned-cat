@@ -1,11 +1,7 @@
-use std::{error::Error, fs::File, io::Read, path::Path};
-
-use serde::Deserialize;
-use toml::from_str;
-
 use crate::schema::Question;
+use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct TestSettings {
     /// Basic info
     pub caption: String,
@@ -49,7 +45,7 @@ impl std::default::Default for TestSettings {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Settings {
     #[serde(default)]
     pub tests_directory_path: String,
@@ -78,12 +74,4 @@ impl std::default::Default for Settings {
             new_file_permissions: 0o640,
         }
     }
-}
-
-pub fn read_settings<P: AsRef<Path>>(path: P) -> Result<Settings, Box<dyn Error>> {
-    let settings_path = path.as_ref().join("settings.toml");
-    let mut file = File::open(settings_path)?;
-    let mut settings = String::new();
-    file.read_to_string(&mut settings)?;
-    Ok(from_str(&settings)?)
 }
