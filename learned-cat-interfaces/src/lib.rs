@@ -1,5 +1,4 @@
 use schema::{Answer, Question};
-use settings::TestSettings;
 
 pub mod network;
 pub mod schema;
@@ -15,57 +14,46 @@ pub trait Server {
 }
 
 /// Интерфейс взаимодействия Экзаменатора с настройками.
-
-/// Интерфейс взаимодействия Экзаменатора с Базой данных.
-pub trait Database {
-    /// Сколько попыток для прохождения теста testname осталось у пользователя username.
-    fn remaining_attempts_number(&mut self, username: &String, testname: &String) -> u32;
-
-    // Функции управления пользователем
-    /// Добавить пользователя.
-    fn append_user(&mut self, username: &String);
-    /// Удалить пользователя.
-    fn remove_user(&mut self, username: &String);
+pub trait Config {
     /// Существует ли пользователь?
     fn has_user(&mut self, username: &String) -> bool;
 
-    // Функции управления тестами.
-    /// Добавить тест.
-    fn append_test(&mut self, settings: &TestSettings);
-    /// Удалить тест.
-    fn remove_test(&mut self, testname: &String);
-    /// Получить параметры теста testname.
-    fn test_settings(&mut self, testname: &String) -> settings::TestSettings;
-    /// Получить описание теста.
-    fn test_banner(&mut self, testname: &String) -> String;
     /// Проверить валидность теста testname.
     fn has_test(&mut self, testname: &String) -> bool;
 
-    // Функции управления вопросами.
-    /// Добавить вопрос к тесту.
-    fn append_question(&mut self, testname: &String, question: Question);
-    /// Удалить вопрос из теста.
-    fn remove_question(&mut self, testname: &String, question_id: u64);
-    /// Получить текст вопроса question_id теста testname.
-    fn question(&mut self, testname: &String, question_id: u64) -> Question;
-    /// Получить ответы на вопрос question_id теста testname.
-    fn answer(&mut self, testname: &String, question_id: u64) -> Answer;
-    /// Установить ответы на вопрос.
-    fn set_answer(&mut self, testname: &String, question_id: u64, answer: Answer);
+    /// Получить параметры теста testname.
+    fn test_settings(&mut self, testname: &String) -> settings::TestSettings;
 
-    // Функции управления вариантами.
+    /// Получить описание теста.
+    fn test_banner(&mut self, testname: &String) -> String;
+
+    /// Получить текст вопроса question_id теста testname.
+    fn question(&mut self, testname: &String, question_id: usize) -> Question;
+
+    /// Получить ответы на вопрос question_id теста testname.
+    fn answer(&mut self, testname: &String, question_id: usize) -> Answer;
+
     /// Проверить доступность теста testname для пользователя username.
     fn has_access(&mut self, username: &String, testname: &String) -> bool;
+
     /// Получить список тестов, доступных пользователю username.
-    fn user_tests_list(&mut self, username: &String) -> Vec<(String, String)>;
-    /// Разрешить пользователю проходить тест.
-    fn append_access(&mut self, username: &String, testname: &String);
-    /// Запретить пользователю проходить тест.
-    fn remove_access(&mut self, username: &String, testname: &String);
+    fn user_tests_list(&mut self, username: &String) -> Vec<String>;
+
+    /// Получить параметры сервера.
+    fn settings(&mut self, testname: &String) -> settings::Settings;
+}
+
+/// Интерфейс взаимодействия Экзаменатора с Базой данных.
+pub trait Database {
+    /// Список пользователей, закончивших хотя бы одну попытку.
+    fn users(&mut self) -> Vec<String>;
+
+    /// Сколько попыток для прохождения теста testname потратил пользователь username.
+    fn attempts_counter(&mut self, username: &String, testname: &String) -> u32;
+
     /// Получить баллы за тест testname для пользователя username.
     fn marks(&mut self, username: &String, testname: &String) -> Vec<f32>;
+
     /// Сохранить баллы за тест testname для пользователя username.
     fn append_mark(&mut self, username: &String, testname: &String, mark: f32);
-    /// Удалить результаты тестирования для пользователя.
-    fn clear_marks(&mut self, username: &String, testname: &String);
 }
