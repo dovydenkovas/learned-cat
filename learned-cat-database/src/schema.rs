@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
@@ -50,11 +51,4 @@ diesel::table! {
     }
 }
 
-diesel::allow_tables_to_appear_in_same_query!(
-    Answer,
-    Question,
-    Test,
-    User,
-    UserTest,
-    Variant,
-);
+diesel::allow_tables_to_appear_in_same_query!(Answer, Question, Test, User, UserTest, Variant,);

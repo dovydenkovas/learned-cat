@@ -20,7 +20,7 @@ pub struct TestSettings {
     pub test_duration_minutes: i64,
 
     #[serde(default)]
-    pub number_of_attempts: usize,
+    pub number_of_attempts: u32,
 
     /// Castumization
     #[serde(default)]

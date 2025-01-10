@@ -1,12 +1,16 @@
 #![allow(unused)]
 use clap::arg;
 use learned_cat::examiner::Examiner;
+use learned_cat::server::SocketServer;
+use learned_cat_database::TestDatabase;
 use std::env::set_current_dir;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use learned_cat::init;
-use learned_cat_interfaces::settings::{read_settings, Settings};
+use learned_cat_config::TomlConfig;
+use learned_cat_interfaces::settings::Settings;
+use learned_cat_interfaces::Config;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = get_arguments();
@@ -17,8 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             init::init_server(&root_path)
         },
         Some(("run", _)) => {
-            let settings = read_settings(&root_path)?;
-            start_server(settings, root_path)?
+            start_server(root_path)?
         },
         Some(("export-results", args)) => {
             // TODO!
@@ -38,13 +41,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn start_server(settings: Settings, path: PathBuf) -> Result<(), Box<dyn Error>> {
-    let tests_path = Path::new(&path).join(&settings.tests_directory_path);
+fn start_server(path: PathBuf) -> Result<(), Box<dyn Error>> {
+    let config = TomlConfig::new(&path)?;
 
-    let database = learned_cat::database::TestDatabase::new(&settings, tests_path);
-    let server = learned_cat::server::SocketServer::new(settings.server_address.clone());
+    let tests_path = Path::new(&path).join(&config.settings().tests_directory_path.clone());
+
+    let database = TestDatabase::new(tests_path);
+    let server = SocketServer::new(config.settings().server_address.clone());
     set_daemon_dir(&path).expect("Error init and start server");
-    let _ = Examiner::new(Box::new(database), Box::new(server));
+    let _ = Examiner::new(Box::new(config), Box::new(database), Box::new(server));
     Ok(())
 }
 
