@@ -16,31 +16,31 @@ pub trait Server {
 /// Интерфейс взаимодействия Экзаменатора с настройками.
 pub trait Config {
     /// Существует ли пользователь?
-    fn has_user(&mut self, username: &String) -> bool;
+    fn has_user(&self, username: &String) -> bool;
 
     /// Проверить валидность теста testname.
-    fn has_test(&mut self, testname: &String) -> bool;
+    fn has_test(&self, testname: &String) -> bool;
 
     /// Получить параметры теста testname.
-    fn test_settings(&mut self, testname: &String) -> settings::TestSettings;
+    fn test_settings(&self, testname: &String) -> settings::TestSettings;
 
     /// Получить описание теста.
-    fn test_banner(&mut self, testname: &String) -> String;
+    fn test_banner(&self, testname: &String) -> String;
 
     /// Получить текст вопроса question_id теста testname.
-    fn question(&mut self, testname: &String, question_id: usize) -> Question;
+    fn question(&self, testname: &String, question_id: usize) -> Question;
 
     /// Получить ответы на вопрос question_id теста testname.
-    fn answer(&mut self, testname: &String, question_id: usize) -> Answer;
+    fn answer(&self, testname: &String, question_id: usize) -> Answer;
 
     /// Проверить доступность теста testname для пользователя username.
-    fn has_access(&mut self, username: &String, testname: &String) -> bool;
+    fn has_access(&self, username: &String, testname: &String) -> bool;
 
     /// Получить список тестов, доступных пользователю username.
-    fn user_tests_list(&mut self, username: &String) -> Vec<String>;
+    fn user_tests_list(&self, username: &String) -> Vec<String>;
 
     /// Получить параметры сервера.
-    fn settings(&mut self, testname: &String) -> settings::Settings;
+    fn settings(&self) -> settings::Settings;
 }
 
 /// Интерфейс взаимодействия Экзаменатора с Базой данных.

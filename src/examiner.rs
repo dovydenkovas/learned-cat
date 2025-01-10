@@ -8,9 +8,10 @@ use learned_cat_interfaces::{
     network::{Command, Response},
     schema::Question,
 };
-use learned_cat_interfaces::{Database, Server};
+use learned_cat_interfaces::{Config, Database, Server};
 
 pub struct Examiner {
+    config: Box<dyn Config>,
     db: Box<dyn Database>,
     srv: Box<dyn Server>,
     /// Хранилище вариантов - username - variants
@@ -18,8 +19,9 @@ pub struct Examiner {
 }
 
 impl Examiner {
-    pub fn new(db: Box<dyn Database>, srv: Box<dyn Server>) -> Examiner {
+    pub fn new(config: Box<dyn Config>, db: Box<dyn Database>, srv: Box<dyn Server>) -> Examiner {
         let examiner = Examiner {
+            config,
             db,
             srv,
             variants: HashMap::new(),
@@ -54,11 +56,11 @@ impl Examiner {
 
     /// Предоставить список доступных тестов.
     fn avaliable_tests(&self, username: &String) -> Response {
-        if !self.db.has_user(username) {
+        if !self.config.has_user(username) {
             Response::NotAllowedUser
         } else {
             Response::AvaliableTests {
-                tests: self.db.user_tests_list(username),
+                tests: self.config.user_tests_list(username),
             }
         }
     }
@@ -82,11 +84,13 @@ impl Examiner {
 
     /// Запустить тест или отправить новый вопрос.
     fn next_question(&mut self, username: &String, testname: &String) -> Response {
-        if !self.db.has_access(username, testname) {
+        if !self.config.has_access(username, testname) {
             return Response::NotAllowedUser;
         }
 
-        if self.db.remaining_attempts_number(username, testname) <= 0 {
+        if self.db.attempts_counter(username, testname)
+            < self.config.test_settings(testname).number_of_attempts
+        {
             return Response::End {
                 result: self.db.marks(username, testname),
             };
@@ -105,7 +109,7 @@ impl Examiner {
 
         self.start_test(username, testname);
         Response::TestStarted {
-            banner: self.db.test_banner(testname),
+            banner: self.config.test_banner(testname),
         }
     }
 
@@ -142,7 +146,7 @@ impl Examiner {
 
     /// Создать вариант теста.
     fn generate_variant(&self, username: &String, testname: &String) -> Variant {
-        let test_settings = self.db.test_settings(testname);
+        let test_settings = self.config.test_settings(testname);
 
         let mut vec: Vec<usize> = (0..test_settings.questions.len()).collect();
         vec.shuffle(&mut thread_rng());
@@ -177,7 +181,7 @@ impl Examiner {
         if !self.is_user_have_opened_variant(username, testname) {
             return false;
         }
-        let test_settings = self.db.test_settings(testname);
+        let test_settings = self.config.test_settings(testname);
         let variant = &self.variants[username];
         if variant.timestamp.is_none() {
             return false;
@@ -228,7 +232,7 @@ impl Examiner {
     /// Завершить тест
     fn done_test(&mut self, username: &String, testname: &String) {
         let mark = self.calculate_mark(username, testname);
-        self.db.add_mark(username, testname, mark);
+        self.db.append_mark(username, testname, mark);
         self.variants.remove(username);
     }
 
