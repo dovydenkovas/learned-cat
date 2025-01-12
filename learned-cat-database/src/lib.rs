@@ -2,6 +2,8 @@
 
 use diesel::prelude::*;
 use dotenvy::dotenv;
+use learned_cat_interfaces::schema::TestRecord;
+use learned_cat_interfaces::Statistic;
 use schema::{Test, User, Variant};
 use std::env;
 use std::process::exit;
@@ -35,13 +37,20 @@ impl TestDatabase {
     }
 }
 
-impl Database for TestDatabase {
+impl Statistic for TestDatabase {
     /// Список пользователей, закончивших хотя бы одну попытку.
     fn users(&mut self) -> Vec<String> {
         use self::schema::User::dsl::*;
         User.select(name).load(&mut self.connection).unwrap()
     }
 
+    /// Список результатов конкретного пользователя.
+    fn results(&mut self, username: &String) -> TestRecord {
+        unimplemented!()
+    }
+}
+
+impl Database for TestDatabase {
     /// Сколько попыток для прохождения теста testname потратил пользователь username.
     fn attempts_counter(&mut self, username: &String, testname: &String) -> u32 {
         Variant::table
