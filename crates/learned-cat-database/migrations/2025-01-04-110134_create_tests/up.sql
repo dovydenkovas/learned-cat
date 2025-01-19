@@ -6,8 +6,7 @@ CREATE TABLE User (
 
 CREATE TABLE Test (
     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    caption VARCHAR NOT NULL,
-    description TEXT NOT NULL
+    caption VARCHAR NOT NULL
 );
 
 CREATE TABLE Variant (
@@ -15,5 +14,6 @@ CREATE TABLE Variant (
     test_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
     mark FLOAT NOT NULL,
-    begin_timestamp VARCHAR NOT NULL
+    start_timestamp VARCHAR NOT NULL,
+    end_timestamp VARCHAR NOT NULL
 );

@@ -14,9 +14,9 @@ toml = { version = "^0.8.10", features = ["display"] }
 rand = "0.8.5"
 walkdir = "2.5.0"
 rustyline = "14.0.0"
-learned-cat-database = { path = "learned-cat-database" }
-learned-cat-interfaces = { path = "learned-cat-interfaces" }
-learned-cat-config = { path = "learned-cat-config" }
+learned-cat-database = { path = "crates/learned-cat-database" }
+learned-cat-interfaces = { path = "crates/learned-cat-interfaces" }
+learned-cat-config = { path = "crates/learned-cat-config" }
 
 [lib]
 

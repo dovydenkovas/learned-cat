@@ -28,6 +28,8 @@
 /// <- Response:ResponseError - некорректный запрос
 use serde::{Deserialize, Serialize};
 
+use crate::schema::Answer;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Request {
     pub user: String,
@@ -51,7 +53,7 @@ pub enum Command {
     GetAvaliableTests,
     StartTest,
     GetNextQuestion,
-    PutAnswer { answer: Vec<usize> },
+    PutAnswer { answer: Answer },
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]

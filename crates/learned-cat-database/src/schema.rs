@@ -1,11 +1,12 @@
 #![allow(non_snake_case)]
 // @generated automatically by Diesel CLI.
 
+use Variant::{end_timestamp, start_timestamp};
+
 diesel::table! {
     Test (id) {
         id -> Integer,
         caption -> Text,
-        description -> Text,
     }
 }
 
@@ -19,14 +20,15 @@ diesel::table! {
 diesel::table! {
     Variant (id) {
         id -> Integer,
-        test_id -> Integer,
-        user_id -> Integer,
+        test -> Integer,
+        user -> Integer,
         mark -> Float,
-        begin_timestamp -> Text,
+        start_timestamp -> Text,
+        end_timestamp -> Text,
     }
 }
 
-diesel::joinable!(Variant -> User (user_id));
-diesel::joinable!(Variant -> Test (test_id));
+diesel::joinable!(Variant -> User (user));
+diesel::joinable!(Variant -> Test (test));
 
 diesel::allow_tables_to_appear_in_same_query!(Test, User, Variant,);

@@ -1,4 +1,4 @@
-use schema::{Answer, Question};
+use schema::{Answer, Question, TestRecord};
 
 pub mod network;
 pub mod schema;
@@ -45,9 +45,6 @@ pub trait Config {
 
 /// Интерфейс взаимодействия Экзаменатора с Базой данных.
 pub trait Database {
-    /// Список пользователей, закончивших хотя бы одну попытку.
-    fn users(&mut self) -> Vec<String>;
-
     /// Сколько попыток для прохождения теста testname потратил пользователь username.
     fn attempts_counter(&mut self, username: &String, testname: &String) -> u32;
 
@@ -55,5 +52,20 @@ pub trait Database {
     fn marks(&mut self, username: &String, testname: &String) -> Vec<f32>;
 
     /// Сохранить баллы за тест testname для пользователя username.
-    fn append_mark(&mut self, username: &String, testname: &String, mark: f32);
+    fn append_mark(
+        &mut self,
+        username: &String,
+        testname: &String,
+        mark: f32,
+        start_timestamp: &String,
+        end_timestamp: &String,
+    );
+}
+
+pub trait Statistic {
+    /// Список пользователей, закончивших хотя бы одну попытку.
+    fn users(&mut self) -> Vec<String>;
+
+    /// Список результатов конкретного пользователя.
+    fn results(&mut self, username: &String) -> TestRecord;
 }
