@@ -24,10 +24,39 @@ pub struct TestDatabase {
 
 impl TestDatabase {
     pub fn new(database_url: String) -> TestDatabase {
-        let connection = SqliteConnection::establish(&database_url).unwrap_or_else(|_| {
+        let mut connection = SqliteConnection::establish(&database_url).unwrap_or_else(|_| {
             eprintln!("Невозможно открыть Sqlite базу данных {}.", database_url);
             exit(1)
         });
+
+        diesel::sql_query(
+            r#"CREATE TABLE User (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            name VARCHAR NOT NULL
+            );"#,
+        )
+        .execute(&mut connection);
+        diesel::sql_query(
+            r#"
+        CREATE TABLE Test (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            caption VARCHAR NOT NULL
+            );"#,
+        )
+        .execute(&mut connection);
+        diesel::sql_query(
+            r#"
+        CREATE TABLE Variant (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            test INTEGER NOT NULL,
+            user INTEGER NOT NULL,
+            mark FLOAT NOT NULL,
+            start_timestamp VARCHAR NOT NULL,
+            end_timestamp VARCHAR NOT NULL
+        );"#,
+        )
+        .execute(&mut connection);
+
         TestDatabase { connection }
     }
 
@@ -98,7 +127,7 @@ impl Database for TestDatabase {
             .left_join(User::table)
             .filter(User::dsl::name.eq(username))
             .left_join(Test::table)
-            .filter(User::dsl::name.eq(testname))
+            .filter(Test::dsl::caption.eq(testname))
             .select(Variant::dsl::start_timestamp)
             .count()
             .get_result::<i64>(&mut self.connection)
@@ -111,7 +140,7 @@ impl Database for TestDatabase {
             .left_join(User::table)
             .filter(User::dsl::name.eq(username))
             .left_join(Test::table)
-            .filter(User::dsl::name.eq(testname))
+            .filter(Test::dsl::caption.eq(testname))
             .select(Variant::dsl::mark)
             .load::<f32>(&mut self.connection)
             .unwrap()
@@ -127,25 +156,27 @@ impl Database for TestDatabase {
         end_time: &String,
     ) {
         use schema::Variant::dsl::*;
-
-        let mut test_id = Variant
-            .filter(start_timestamp.eq(&start_time))
-            .select(id)
-            .get_result::<i32>(&mut self.connection);
-        if test_id.is_ok() {
-            return;
-        }
-
         let user_id = self.append_user(username.clone());
         let test_id = self.append_test(testname.clone());
 
+        let mut mark_id = Variant
+            .filter(start_timestamp.eq(&start_time))
+            .filter(end_timestamp.eq(&end_time))
+            .filter(user.eq(user_id))
+            .filter(test.eq(test_id))
+            .select(id)
+            .get_result::<i32>(&mut self.connection);
+        if mark_id.is_ok() {
+            return;
+        }
+
         insert_into(Variant)
             .values((
-                schema::Variant::user.eq(user_id),
-                schema::Variant::test.eq(test_id),
-                schema::Variant::mark.eq(mark_value),
-                schema::Variant::start_timestamp.eq(start_time.clone()),
-                schema::Variant::end_timestamp.eq(end_time.clone()),
+                user.eq(user_id),
+                test.eq(test_id),
+                mark.eq(mark_value),
+                start_timestamp.eq(start_time.clone()),
+                end_timestamp.eq(end_time.clone()),
             ))
             .execute(&mut self.connection)
             .unwrap();
@@ -164,10 +195,42 @@ mod tests {
     }
 
     fn fill_database(db: &mut TestDatabase) {
-        db.append_mark(&"vlad".to_string(), &"math".to_string(), 5.0, "0", "1");
-        db.append_mark(&"sveta".to_string(), &"math".to_string(), 8.8, "0", "1");
-        db.append_mark(&"artem".to_string(), &"history".to_string(), 4.83, "0", "1");
-        db.append_mark(&"vlad".to_string(), &"marh".to_string(), 3.2, "0", "1");
+        let start_time = "0".to_string();
+        let end_time = "1".to_string();
+        db.append_mark(
+            &"vlad".to_string(),
+            &"math".to_string(),
+            5.0,
+            &start_time,
+            &end_time,
+        );
+        let start_time = "2".to_string();
+        let end_time = "3".to_string();
+        db.append_mark(
+            &"sveta".to_string(),
+            &"math".to_string(),
+            8.8,
+            &start_time,
+            &end_time,
+        );
+        let start_time = "3".to_string();
+        let end_time = "4".to_string();
+        db.append_mark(
+            &"artem".to_string(),
+            &"history".to_string(),
+            4.83,
+            &start_time,
+            &end_time,
+        );
+        let start_time = "5".to_string();
+        let end_time = "6".to_string();
+        db.append_mark(
+            &"vlad".to_string(),
+            &"math".to_string(),
+            3.2,
+            &start_time,
+            &end_time,
+        );
     }
 
     #[test]
@@ -198,14 +261,17 @@ mod tests {
         assert_eq!(db.users(), vec![] as Vec<String>);
         fill_database(&mut db);
 
-        assert_eq!(db.users(), vec!["vlad", "artem", "sveta"]);
+        let mut users = db.users();
+        users.sort();
+
+        assert_eq!(users, vec!["artem", "sveta", "vlad"]);
 
         std::fs::remove_file(db_path).unwrap();
     }
 
     #[test]
     fn attempts_couter() {
-        let db_path = "/tmp/lc_users.db";
+        let db_path = "/tmp/lc_attempts_counter.db";
         let mut db = TestDatabase::new(db_path.to_string());
 
         assert_eq!(
