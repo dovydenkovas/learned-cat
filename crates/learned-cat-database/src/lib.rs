@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use diesel::prelude::*;
+use diesel::{insert_into, prelude::*};
 use dotenvy::dotenv;
 use learned_cat_interfaces::schema::TestRecord;
 use learned_cat_interfaces::Statistic;
@@ -8,11 +8,6 @@ use schema::{Test, User, Variant};
 use std::env;
 use std::process::exit;
 use std::{collections::HashMap, path::PathBuf};
-
-// use self::schema::Answer::dsl::*;
-// use self::schema::Question::dsl::*;
-// use self::schema::Test::dsl::*;
-// use self::schema::Variant::dsl::*;
 
 pub mod models;
 pub mod schema;
@@ -34,6 +29,52 @@ impl TestDatabase {
             exit(1)
         });
         TestDatabase { connection }
+    }
+
+    fn append_user(&mut self, username: String) -> i32 {
+        use schema::User::dsl::*;
+
+        let mut user_id = User
+            .filter(name.eq(&username))
+            .select(id)
+            .get_result::<i32>(&mut self.connection);
+
+        if user_id.is_err() {
+            insert_into(User)
+                .values((name.eq(username.clone()),))
+                .execute(&mut self.connection)
+                .unwrap();
+
+            user_id = User
+                .filter(name.eq(&username))
+                .select(id)
+                .get_result::<i32>(&mut self.connection);
+        }
+
+        user_id.unwrap()
+    }
+
+    fn append_test(&mut self, testname: String) -> i32 {
+        use schema::Test::dsl::*;
+
+        let mut test_id = Test
+            .filter(caption.eq(&testname))
+            .select(id)
+            .get_result::<i32>(&mut self.connection);
+
+        if test_id.is_err() {
+            insert_into(Test)
+                .values((caption.eq(testname.clone()),))
+                .execute(&mut self.connection)
+                .unwrap();
+
+            test_id = Test
+                .filter(caption.eq(&testname))
+                .select(id)
+                .get_result::<i32>(&mut self.connection);
+        }
+
+        test_id.unwrap()
     }
 }
 
@@ -58,7 +99,7 @@ impl Database for TestDatabase {
             .filter(User::dsl::name.eq(username))
             .left_join(Test::table)
             .filter(User::dsl::name.eq(testname))
-            .select(Variant::dsl::begin_timestamp)
+            .select(Variant::dsl::start_timestamp)
             .count()
             .get_result::<i64>(&mut self.connection)
             .unwrap() as u32
@@ -77,14 +118,37 @@ impl Database for TestDatabase {
     }
 
     /// Сохранить баллы за тест testname для пользователя username.
-    fn append_mark(&mut self, username: &String, testname: &String, mark: f32) {
-        if User::table
-            .filter(User::dsl::name.eq(username))
-            .count()
-            .get_result::<i64>(&mut self.connection)
-            .unwrap()
-            == 0
-        {}
+    fn append_mark(
+        &mut self,
+        username: &String,
+        testname: &String,
+        mark_value: f32,
+        start_time: &String,
+        end_time: &String,
+    ) {
+        use schema::Variant::dsl::*;
+
+        let mut test_id = Variant
+            .filter(start_timestamp.eq(&start_time))
+            .select(id)
+            .get_result::<i32>(&mut self.connection);
+        if test_id.is_ok() {
+            return;
+        }
+
+        let user_id = self.append_user(username.clone());
+        let test_id = self.append_test(testname.clone());
+
+        insert_into(Variant)
+            .values((
+                schema::Variant::user.eq(user_id),
+                schema::Variant::test.eq(test_id),
+                schema::Variant::mark.eq(mark_value),
+                schema::Variant::start_timestamp.eq(start_time.clone()),
+                schema::Variant::end_timestamp.eq(end_time.clone()),
+            ))
+            .execute(&mut self.connection)
+            .unwrap();
     }
 }
 
@@ -100,10 +164,10 @@ mod tests {
     }
 
     fn fill_database(db: &mut TestDatabase) {
-        db.append_mark(&"vlad".to_string(), &"math".to_string(), 5.0);
-        db.append_mark(&"sveta".to_string(), &"math".to_string(), 8.8);
-        db.append_mark(&"artem".to_string(), &"history".to_string(), 4.83);
-        db.append_mark(&"vlad".to_string(), &"marh".to_string(), 3.2);
+        db.append_mark(&"vlad".to_string(), &"math".to_string(), 5.0, "0", "1");
+        db.append_mark(&"sveta".to_string(), &"math".to_string(), 8.8, "0", "1");
+        db.append_mark(&"artem".to_string(), &"history".to_string(), 4.83, "0", "1");
+        db.append_mark(&"vlad".to_string(), &"marh".to_string(), 3.2, "0", "1");
     }
 
     #[test]

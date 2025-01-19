@@ -3,6 +3,7 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::Path;
 
+use learned_cat_interfaces::schema::Answer;
 use learned_cat_interfaces::schema::Question;
 use learned_cat_interfaces::settings::TestSettings;
 
@@ -24,7 +25,7 @@ pub fn read_test(path: &Path, test: &mut TestSettings) {
     let mut question = Question {
         question: "".to_string(),
         answers: vec![],
-        correct_answers: vec![],
+        correct_answer: Answer::new(vec![]),
     };
 
     let mut state = ParseState::TestBanner;
@@ -57,7 +58,7 @@ pub fn read_test(path: &Path, test: &mut TestSettings) {
                     question = Question {
                         question: "".to_string(),
                         answers: vec![],
-                        correct_answers: vec![],
+                        correct_answer: Answer::new(vec![]),
                     };
 
                     answer_number = 0;
@@ -78,7 +79,7 @@ pub fn read_test(path: &Path, test: &mut TestSettings) {
                 } else if line.starts_with("+") {
                     // true answer
                     question.answers.push(line[1..].trim().to_string());
-                    question.correct_answers.push(answer_number);
+                    question.correct_answer.push(answer_number);
                     answer_number += 1;
                 } else {
                     // multiline answer
