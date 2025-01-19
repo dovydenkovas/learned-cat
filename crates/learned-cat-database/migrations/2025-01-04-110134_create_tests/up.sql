@@ -11,8 +11,8 @@ CREATE TABLE Test (
 
 CREATE TABLE Variant (
     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    test_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
+    test INTEGER NOT NULL,
+    user INTEGER NOT NULL,
     mark FLOAT NOT NULL,
     start_timestamp VARCHAR NOT NULL,
     end_timestamp VARCHAR NOT NULL
