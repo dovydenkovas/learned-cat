@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
-use learned_cat_interfaces::schema::Variant;
+use learned_cat_interfaces::schema::{Answer, Variant};
 use learned_cat_interfaces::{
     network::{Command, Response},
     schema::Question,
@@ -66,12 +66,7 @@ impl Examiner {
     }
 
     /// Сохранить ответ на вопрос.
-    pub fn put_answer(
-        &mut self,
-        username: &String,
-        testname: &String,
-        answer: &Vec<usize>,
-    ) -> Response {
+    fn put_answer(&mut self, username: &String, testname: &String, answer: &Answer) -> Response {
         self._put_answer(username, testname, &answer);
         if self.is_next_question(username, testname) {
             Response::Ok
@@ -116,8 +111,8 @@ impl Examiner {
     /// Возвращает первый неотвеченный вопрос.
     fn get_next_question(&mut self, username: &String) -> Response {
         let variant = self.variants.get_mut(username).unwrap();
-        if variant.timestamp.is_none() {
-            variant.timestamp = Some(chrono::offset::Local::now());
+        if variant.start_timestamp.is_none() {
+            variant.start_timestamp = Some(chrono::offset::Local::now());
         }
 
         let mut id = variant.current_question;
@@ -159,11 +154,10 @@ impl Examiner {
         Variant {
             username: username.clone(),
             testname: testname.clone(),
-            timestamp: None,
+            start_timestamp: None,
             questions,
             answers: vec![],
             current_question: None,
-            result: None,
         }
     }
 
@@ -183,11 +177,11 @@ impl Examiner {
         }
         let test_settings = self.config.test_settings(testname);
         let variant = &self.variants[username];
-        if variant.timestamp.is_none() {
+        if variant.start_timestamp.is_none() {
             return false;
         }
 
-        if (chrono::Local::now() - variant.timestamp.unwrap())
+        if (chrono::Local::now() - variant.start_timestamp.unwrap())
             > chrono::Duration::new(test_settings.test_duration_minutes * 60, 0).unwrap()
         {
             return true;
@@ -209,7 +203,7 @@ impl Examiner {
     }
 
     /// Сохранить ответ пользователя на последний неотвеченный вопрос.
-    fn _put_answer(&mut self, username: &String, testname: &String, answer: &Vec<usize>) {
+    fn _put_answer(&mut self, username: &String, testname: &String, answer: &Answer) {
         if !self.is_user_have_opened_variant(username, testname) {
             eprintln!("ERROR: Test was done. Ignore put answer.");
             return;
@@ -232,7 +226,10 @@ impl Examiner {
     /// Завершить тест
     fn done_test(&mut self, username: &String, testname: &String) {
         let mark = self.calculate_mark(username, testname);
-        self.db.append_mark(username, testname, mark);
+        let start_time = self.variants[username].start_timestamp.unwrap().to_string();
+        let end_time = chrono::Local::now().to_string();
+        self.db
+            .append_mark(username, testname, mark, &start_time, &end_time);
         self.variants.remove(username);
     }
 
@@ -246,12 +243,10 @@ impl Examiner {
         let variant = self.variants.get_mut(username).unwrap();
         let mut result: f32 = 0.0;
         for i in 0..variant.questions.len() {
-            variant.answers[i].sort();
-            if variant.questions[i].correct_answers == variant.answers[i] {
+            if variant.questions[i].correct_answer == variant.answers[i] {
                 result += 1.0;
             }
         }
-        variant.result = Some(result);
         result
     }
 

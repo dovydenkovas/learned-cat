@@ -8,7 +8,10 @@ use clap::Parser;
 use rustyline::DefaultEditor;
 use whoami;
 
-use learned_cat_interfaces::network::{Command, Request, Response};
+use learned_cat_interfaces::{
+    network::{Command, Request, Response},
+    schema::Answer,
+};
 
 /// Структура аргументов командной строки.
 #[derive(Parser)]
@@ -107,7 +110,9 @@ fn run_test(test_name: String, next_question: Option<Response>) {
                 let put_answer_request = Request::new(
                     whoami::username(),
                     test_name.clone(),
-                    Command::PutAnswer { answer: answers },
+                    Command::PutAnswer {
+                        answer: Answer::new(answers),
+                    },
                 );
 
                 match send_request(&put_answer_request) {
