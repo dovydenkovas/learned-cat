@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::schema::Answer;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Request {
     pub user: String,
     pub test: String,

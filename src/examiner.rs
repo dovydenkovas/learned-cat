@@ -265,3 +265,123 @@ impl Examiner {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use learned_cat_interfaces::{
+        network,
+        schema::{Answer, Question},
+        settings::{self},
+        Config, Database, Server,
+    };
+
+    use super::Examiner;
+
+    struct TDatabase {}
+
+    #[allow(unused)]
+    impl Database for TDatabase {
+        fn attempts_counter(&mut self, username: &String, testname: &String) -> u32 {
+            2
+        }
+
+        fn marks(&mut self, username: &String, testname: &String) -> Vec<f32> {
+            vec![3.0, 4.0, 5.0]
+        }
+
+        /// Сохранить баллы за тест testname для пользователя username.
+        fn append_mark(
+            &mut self,
+            username: &String,
+            testname: &String,
+            mark: f32,
+            start_timestamp: &String,
+            end_timestamp: &String,
+        ) {
+        }
+    }
+
+    struct TServer {}
+
+    impl Server for TServer {
+        fn pop_request(&mut self) -> Option<network::Request> {
+            Some(network::Request::new(
+                "user",
+                "test",
+                network::Command::GetNextQuestion,
+            ))
+        }
+
+        fn push_response(&mut self, response: network::Response) {
+            assert_ne!(response, network::Response::ResponseError);
+        }
+    }
+
+    struct TConfig {}
+    #[allow(unused)]
+    impl Config for TConfig {
+        fn has_user(&self, username: &String) -> bool {
+            true
+        }
+
+        fn has_test(&self, testname: &String) -> bool {
+            true
+        }
+
+        fn test_settings(&self, testname: &String) -> settings::TestSettings {
+            settings::TestSettings {
+                caption: "math".to_string(),
+                banner: "math test".to_string(),
+                questions: vec![],
+                questions_number: 2,
+                test_duration_minutes: 1,
+                number_of_attempts: 3,
+                show_results: true,
+                allowed_users: vec!["user".to_string()],
+            }
+        }
+
+        fn test_banner(&self, testname: &String) -> String {
+            "description".to_string()
+        }
+
+        fn question(&self, testname: &String, question_id: usize) -> Question {
+            Question {
+                question: "text".to_string(),
+                answers: vec!["A".to_string(), "B".to_string()],
+                correct_answer: Answer::new(vec![1, 2, 3]),
+            }
+        }
+
+        fn answer(&self, testname: &String, question_id: usize) -> Answer {
+            Answer::new(vec![1, 2])
+        }
+
+        fn has_access(&self, username: &String, testname: &String) -> bool {
+            true
+        }
+
+        fn user_tests_list(&self, username: &String) -> Vec<String> {
+            vec!["A".to_string(), "B".to_string(), "C".to_string()]
+        }
+
+        fn settings(&self) -> settings::Settings {
+            settings::Settings {
+                tests_directory_path: "example-config".to_string(),
+                result_path: "marks.db".to_string(),
+                server_address: "127.0.0.1:8080".to_string(),
+                tests: vec![self.test_settings(&"math".to_string())],
+                new_file_permissions: 0x660,
+            }
+        }
+    }
+    #[test]
+    fn examiner() {
+        let config = TConfig {};
+        let database = TDatabase {};
+        let server = TServer {};
+        let mut examiner = Examiner::new(Box::new(config), Box::new(database), Box::new(server));
+        //examiner.mainloop();
+        assert!(false);
+    }
+}

@@ -49,7 +49,8 @@ fn start_server(path: PathBuf) -> Result<(), Box<dyn Error>> {
     let database = TestDatabase::new(tests_path.to_str().unwrap().to_string());
     let server = SocketServer::new(config.settings().server_address.clone());
     set_daemon_dir(&path).expect("Error init and start server");
-    let _ = Examiner::new(Box::new(config), Box::new(database), Box::new(server));
+    let mut examiner = Examiner::new(Box::new(config), Box::new(database), Box::new(server));
+    examiner.mainloop();
     Ok(())
 }
 
