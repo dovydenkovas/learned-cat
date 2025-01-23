@@ -13,7 +13,7 @@ impl Answer {
     }
 }
 
-#[derive(Debug, Deserialize, Clone, Serialize)]
+#[derive(Debug, Deserialize, Clone, Serialize, PartialEq)]
 pub struct Question {
     pub question: String,
     pub answers: Vec<String>,
