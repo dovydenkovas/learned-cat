@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn start_server(path: PathBuf) -> Result<(), Box<dyn Error>> {
     let config = TomlConfig::new(&path)?;
 
-    let tests_path = Path::new(&path).join(&config.settings().tests_directory_path.clone());
+    let tests_path = Path::new(&path).join(&config.settings().result_path.clone());
 
     let database = TestDatabase::new(tests_path.to_str().unwrap().to_string());
     let server = SocketServer::new(config.settings().server_address.clone());

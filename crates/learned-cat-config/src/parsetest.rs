@@ -5,6 +5,7 @@ use std::path::Path;
 
 use learned_cat_interfaces::schema::Answer;
 use learned_cat_interfaces::schema::Question;
+use learned_cat_interfaces::settings::Test;
 use learned_cat_interfaces::settings::TestSettings;
 
 enum ParseState {
@@ -14,7 +15,7 @@ enum ParseState {
 }
 
 /// Парсит Markdown файл тестирования
-pub fn read_test(path: &Path, test: &mut TestSettings) {
+pub fn read_test(path: &Path) -> Test {
     let file = File::open(path).expect(format!("Не могу открыть файл теста: {:?}", path).as_str());
     let file = BufReader::new(file);
 
@@ -43,7 +44,7 @@ pub fn read_test(path: &Path, test: &mut TestSettings) {
             }
 
             ParseState::ReadQuestion => {
-                if line.starts_with("*") || line.starts_with("+") {
+                if line.starts_with("*") || line.starts_with("+") || line.starts_with("-") {
                     state = ParseState::ReadAnswer;
                 }
             }
@@ -60,7 +61,6 @@ pub fn read_test(path: &Path, test: &mut TestSettings) {
                         answers: vec![],
                         correct_answer: Answer::new(vec![]),
                     };
-
                     answer_number = 0;
                 }
             }
@@ -72,7 +72,7 @@ pub fn read_test(path: &Path, test: &mut TestSettings) {
             }
 
             ParseState::ReadAnswer => {
-                if line.starts_with("*") {
+                if line.starts_with("*") || line.starts_with("-") {
                     // answer
                     question.answers.push(line[1..].trim().to_string());
                     answer_number += 1;
@@ -99,6 +99,5 @@ pub fn read_test(path: &Path, test: &mut TestSettings) {
         questions.push(question);
     }
 
-    test.banner = banner;
-    test.questions = questions;
+    Test { banner, questions }
 }

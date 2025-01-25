@@ -11,6 +11,11 @@ impl Answer {
         answers.sort();
         Answer { answers }
     }
+
+    pub fn push(&mut self, answer: usize) {
+        self.answers.push(answer);
+        self.answers.sort();
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize, PartialEq)]

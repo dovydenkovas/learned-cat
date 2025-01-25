@@ -1,18 +1,18 @@
 use crate::schema::Question;
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Clone)]
+pub struct Test {
+    pub banner: String,
+    pub questions: Vec<Question>,
+}
+
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct TestSettings {
     /// Basic info
     pub caption: String,
 
-    #[serde(default)]
-    pub banner: String,
-
     /// Variant parameters
-    #[serde(default)]
-    pub questions: Vec<Question>,
-
     #[serde(default)]
     pub questions_number: usize,
 
@@ -34,8 +34,6 @@ impl std::default::Default for TestSettings {
     fn default() -> TestSettings {
         TestSettings {
             caption: "".to_string(),
-            banner: "".to_string(),
-            questions: vec![],
             questions_number: 0,
             test_duration_minutes: 0,
             show_results: true,
@@ -45,7 +43,7 @@ impl std::default::Default for TestSettings {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct Settings {
     #[serde(default)]
     pub tests_directory_path: String,
