@@ -5,10 +5,12 @@ use std::{
     fs::File,
     io::Read,
     path::Path,
+    rc::Rc,
 };
 
 use std::error::Error;
 
+use parsetest::read_test;
 use toml::from_str;
 
 mod parsetest;
@@ -16,17 +18,19 @@ mod parsetest;
 use learned_cat_interfaces::{
     self,
     schema::{Answer, Question},
-    settings::{Settings, TestSettings},
+    settings::{Settings, Test, TestSettings},
     Config,
 };
 
+#[derive(Debug, PartialEq, Clone)]
 pub struct TomlConfig {
     settings: Settings,
 
     // Таблица пользователь: список доступных тестов.
     users: HashMap<String, HashSet<String>>,
     // Таблица тест: настройки.
-    tests: HashMap<String, TestSettings>,
+    tests: HashMap<String, Test>,
+    test_settings: HashMap<String, TestSettings>,
 }
 
 impl TomlConfig {
@@ -35,11 +39,18 @@ impl TomlConfig {
         let mut file = File::open(settings_path)?;
         let mut settings = String::new();
         file.read_to_string(&mut settings)?;
-        let settings: Settings = from_str(&settings)?;
+        let mut settings: Settings = from_str(&settings)?;
         let mut users = HashMap::new();
         let mut tests = HashMap::new();
+        let mut test_settings = HashMap::new();
+
+        let path = root_path.join(&settings.tests_directory_path);
         for test in &settings.tests {
-            tests.insert(test.caption.clone(), test.clone());
+            let test_path = path.join(test.caption.clone() + ".md");
+            let questions = read_test(&test_path);
+            tests.insert(test.caption.clone(), questions);
+
+            test_settings.insert(test.caption.clone(), test.clone());
             for user in &test.allowed_users {
                 if !users.contains_key(user) {
                     users.insert(user.clone(), HashSet::new());
@@ -52,6 +63,7 @@ impl TomlConfig {
             settings,
             users,
             tests,
+            test_settings,
         })
     }
 }
@@ -68,36 +80,60 @@ impl Config for TomlConfig {
     }
 
     /// Получить параметры теста testname.
-    fn test_settings(&self, testname: &String) -> TestSettings {
-        self.tests[testname].to_owned()
+    fn test_settings(&self, testname: &String) -> Option<TestSettings> {
+        if self.has_test(testname) {
+            println!("{:?}", self.tests[testname]);
+            return Some(self.test_settings[testname].clone());
+        }
+        None
     }
 
     /// Получить описание теста.
-    fn test_banner(&self, testname: &String) -> String {
-        self.tests[testname].banner.clone()
+    fn test_banner(&self, testname: &String) -> Option<String> {
+        if self.has_test(testname) {
+            return Some(self.tests[testname].banner.clone());
+        }
+        None
     }
 
     /// Получить текст вопроса question_id теста testname.
-    fn question(&self, testname: &String, question_id: usize) -> Question {
-        unimplemented!("Нет чтения файлов тестов!");
-        //self.tests[testname].questions[question_id].clone()
+    fn question(&self, testname: &String, question_id: usize) -> Option<Question> {
+        if self.has_test(testname) && question_id < self.tests[testname].questions.len() {
+            return Some(self.tests[testname].questions[question_id].clone());
+        }
+        None
+    }
+
+    fn questions_count(&self, testname: &String) -> Option<usize> {
+        if self.has_test(testname) {
+            return Some(self.tests[testname].questions.len());
+        }
+        None
     }
 
     /// Получить ответы на вопрос question_id теста testname.
-    fn answer(&self, testname: &String, question_id: usize) -> Answer {
-        // TODO! Спарсить вопросы
-        unimplemented!("Нет чтения файлов тестов!");
-        //Answer { answers: vec![] }
+    fn answer(&self, testname: &String, question_id: usize) -> Option<Answer> {
+        if self.has_test(testname) && question_id < self.tests[testname].questions.len() {
+            return Some(
+                self.tests[testname].questions[question_id]
+                    .correct_answer
+                    .clone(),
+            );
+        }
+        None
     }
 
     /// Проверить доступность теста testname для пользователя username.
     fn has_access(&self, username: &String, testname: &String) -> bool {
-        self.users[username].contains(testname)
+        self.has_user(username) && self.users[username].contains(testname)
     }
 
     /// Получить список тестов, доступных пользователю username.
     fn user_tests_list(&self, username: &String) -> Vec<String> {
-        self.users[username].clone().into_iter().collect()
+        if self.has_user(username) {
+            return self.users[username].clone().into_iter().collect();
+        }
+        vec![]
     }
 
     /// Получить параметры сервера.
@@ -117,7 +153,7 @@ mod tests {
     use crate::TomlConfig;
 
     fn load_config() -> TomlConfig {
-        let path = Path::new("../example-config/settings.toml");
+        let path = Path::new("../../example-config/");
         let conf = TomlConfig::new(path);
         assert!(conf.is_ok());
         conf.unwrap()
@@ -136,10 +172,9 @@ mod tests {
         let config = load_config();
         assert!(config.has_user(&"student".to_string()));
         assert!(!config.has_user(&"tux".to_string()));
-        assert_eq!(
-            config.user_tests_list(&"asd".to_string()),
-            vec!["linux", "python"]
-        );
+        let mut asd_tests = config.user_tests_list(&"asd".to_string());
+        asd_tests.sort();
+        assert_eq!(asd_tests, vec!["linux", "python"]);
         assert_eq!(
             config.user_tests_list(&"student".to_string()),
             vec!["linux"]
@@ -155,17 +190,14 @@ mod tests {
         let config = load_config();
         assert!(config.has_test(&"python".to_string()));
         assert!(!config.has_test(&"astronomy".to_string()));
+        println!("{:?}", config.test_settings(&"python".to_string()));
         assert_eq!(
-            config.test_banner(&"python".to_string()),
+            config.test_banner(&"python".to_string()).unwrap(),
             "Предполагается, что все используемые в примерах библиотеки были импортированы."
         );
-        assert_eq!(config.test_banner(&"astronomy".to_string()), "");
-        let settings = config.test_settings(&"linux".to_string());
+        assert!(config.test_banner(&"astronomy".to_string()).is_none());
+        let settings = config.test_settings(&"linux".to_string()).unwrap();
         assert_eq!(settings.caption, "linux");
-        assert_eq!(
-            settings.banner,
-            "Тест на знание основных иструментов Linux."
-        );
         assert_eq!(settings.allowed_users, vec!["asd", "student"]);
         assert_eq!(settings.number_of_attempts, 3);
     }
@@ -173,13 +205,9 @@ mod tests {
     #[test]
     fn tests_questions() {
         let config = load_config();
+        assert_eq!(config.questions_count(&"linux".to_string()).unwrap(), 6);
         assert_eq!(
-            config.test_settings(&"linux".to_string()).questions.len(),
-            6
-        );
-
-        assert_eq!(
-            config.question(&"linux".to_string(), 0),
+            config.question(&"linux".to_string(), 0).unwrap(),
             Question {
                 question: "Что делает утилита cat?".to_string(),
                 answers: vec![

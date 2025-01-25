@@ -17,7 +17,7 @@ impl SocketServer {
     pub fn new(address: String) -> SocketServer {
         println!("* Открываю порт сервера: {}", address);
         let listener = TcpListener::bind(address).expect("Не могу открыть соединение");
-        let _ = listener.set_nonblocking(true);
+        //let _ = listener.set_nonblocking(true);
 
         SocketServer {
             listener,

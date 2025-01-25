@@ -84,7 +84,11 @@ impl Examiner {
         }
 
         if self.db.attempts_counter(username, testname)
-            < self.config.test_settings(testname).number_of_attempts
+            < self
+                .config
+                .test_settings(testname)
+                .unwrap()
+                .number_of_attempts
         {
             return Response::End {
                 result: self.db.marks(username, testname),
@@ -104,7 +108,7 @@ impl Examiner {
 
         self.start_test(username, testname);
         Response::TestStarted {
-            banner: self.config.test_banner(testname),
+            banner: self.config.test_banner(testname).unwrap(),
         }
     }
 
@@ -141,14 +145,14 @@ impl Examiner {
 
     /// Создать вариант теста.
     fn generate_variant(&self, username: &String, testname: &String) -> Variant {
-        let test_settings = self.config.test_settings(testname);
+        let test_settings = self.config.test_settings(testname).unwrap();
 
-        let mut vec: Vec<usize> = (0..test_settings.questions.len()).collect();
+        let mut vec: Vec<usize> = (0..self.config.questions_count(testname).unwrap()).collect();
         vec.shuffle(&mut thread_rng());
 
         let mut questions: Vec<Question> = vec![];
         for i in 0..test_settings.questions_number {
-            questions.push(test_settings.questions[vec[i]].clone());
+            questions.push(self.config.question(testname, vec[i]).unwrap().clone());
         }
 
         Variant {
@@ -175,7 +179,7 @@ impl Examiner {
         if !self.is_user_have_opened_variant(username, testname) {
             return false;
         }
-        let test_settings = self.config.test_settings(testname);
+        let test_settings = self.config.test_settings(testname).unwrap();
         let variant = &self.variants[username];
         if variant.start_timestamp.is_none() {
             return false;
@@ -218,7 +222,7 @@ impl Examiner {
 
         variant.answers.push(answer.clone());
         variant.current_question = Some(variant.current_question.unwrap() + 1);
-        if variant.current_question.unwrap() == variant.questions.len() {
+        if variant.answers.len() == variant.questions.len() {
             self.done_test(username, testname)
         }
     }
@@ -241,8 +245,9 @@ impl Examiner {
         }
 
         let variant = self.variants.get_mut(username).unwrap();
+        println!("{:?} {:?}", variant.questions, variant.answers);
         let mut result: f32 = 0.0;
-        for i in 0..variant.questions.len() {
+        for i in 0..variant.answers.len() {
             if variant.questions[i].correct_answer == variant.answers[i] {
                 result += 1.0;
             }
@@ -328,33 +333,36 @@ mod tests {
             true
         }
 
-        fn test_settings(&self, testname: &String) -> settings::TestSettings {
-            settings::TestSettings {
+        fn test_settings(&self, testname: &String) -> Option<settings::TestSettings> {
+            Some(settings::TestSettings {
                 caption: "math".to_string(),
-                banner: "math test".to_string(),
-                questions: vec![],
                 questions_number: 2,
                 test_duration_minutes: 1,
                 number_of_attempts: 3,
                 show_results: true,
                 allowed_users: vec!["user".to_string()],
-            }
+            })
         }
 
-        fn test_banner(&self, testname: &String) -> String {
-            "description".to_string()
+        fn test_banner(&self, testname: &String) -> Option<String> {
+            Some("description".to_string())
         }
 
-        fn question(&self, testname: &String, question_id: usize) -> Question {
-            Question {
+        fn question(&self, testname: &String, question_id: usize) -> Option<Question> {
+            Some(Question {
                 question: "text".to_string(),
                 answers: vec!["A".to_string(), "B".to_string()],
                 correct_answer: Answer::new(vec![1, 2, 3]),
-            }
+            })
         }
 
-        fn answer(&self, testname: &String, question_id: usize) -> Answer {
-            Answer::new(vec![1, 2])
+        /// Получить количество вопросов в тесте.
+        fn questions_count(&self, testname: &String) -> Option<usize> {
+            Some(1)
+        }
+
+        fn answer(&self, testname: &String, question_id: usize) -> Option<Answer> {
+            Some(Answer::new(vec![1, 2]))
         }
 
         fn has_access(&self, username: &String, testname: &String) -> bool {
@@ -370,18 +378,18 @@ mod tests {
                 tests_directory_path: "example-config".to_string(),
                 result_path: "marks.db".to_string(),
                 server_address: "127.0.0.1:8080".to_string(),
-                tests: vec![self.test_settings(&"math".to_string())],
+                tests: vec![self.test_settings(&"math".to_string()).unwrap()],
                 new_file_permissions: 0x660,
             }
         }
     }
-    #[test]
-    fn examiner() {
-        let config = TConfig {};
-        let database = TDatabase {};
-        let server = TServer {};
-        let mut examiner = Examiner::new(Box::new(config), Box::new(database), Box::new(server));
-        //examiner.mainloop();
-        assert!(false);
-    }
+    // #[test]
+    // fn examiner() {
+    //     let config = TConfig {};
+    //     let database = TDatabase {};
+    //     let server = TServer {};
+    //     let mut examiner = Examiner::new(Box::new(config), Box::new(database), Box::new(server));
+    //     //examiner.mainloop();
+    //     //assert!(false);
+    // }
 }

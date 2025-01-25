@@ -22,16 +22,19 @@ pub trait Config {
     fn has_test(&self, testname: &String) -> bool;
 
     /// Получить параметры теста testname.
-    fn test_settings(&self, testname: &String) -> settings::TestSettings;
+    fn test_settings(&self, testname: &String) -> Option<settings::TestSettings>;
 
     /// Получить описание теста.
-    fn test_banner(&self, testname: &String) -> String;
+    fn test_banner(&self, testname: &String) -> Option<String>;
 
     /// Получить текст вопроса question_id теста testname.
-    fn question(&self, testname: &String, question_id: usize) -> Question;
+    fn question(&self, testname: &String, question_id: usize) -> Option<Question>;
+
+    /// Получить количество вопросов в тесте.
+    fn questions_count(&self, testname: &String) -> Option<usize>;
 
     /// Получить ответы на вопрос question_id теста testname.
-    fn answer(&self, testname: &String, question_id: usize) -> Answer;
+    fn answer(&self, testname: &String, question_id: usize) -> Option<Answer>;
 
     /// Проверить доступность теста testname для пользователя username.
     fn has_access(&self, username: &String, testname: &String) -> bool;
