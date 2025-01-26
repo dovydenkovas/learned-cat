@@ -174,7 +174,7 @@ mod tests {
         assert!(!config.has_user(&"tux".to_string()));
         let mut asd_tests = config.user_tests_list(&"asd".to_string());
         asd_tests.sort();
-        assert_eq!(asd_tests, vec!["linux", "python"]);
+        assert_eq!(asd_tests, vec!["algo", "linux", "python"]);
         assert_eq!(
             config.user_tests_list(&"student".to_string()),
             vec!["linux"]

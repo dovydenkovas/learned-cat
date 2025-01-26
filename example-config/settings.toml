@@ -18,3 +18,12 @@ test_duration_minutes = 5
 show_results = true
 allowed_users = ["asd"]
 number_of_attempts = 1
+
+
+[[test]]
+caption = "algo"
+questions_number = 10
+test_duration_minutes = 15
+show_results = true
+allowed_users = ["asd"]
+number_of_attempts = 0
