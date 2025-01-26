@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use learned_cat_interfaces::network::Request;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
@@ -8,22 +9,28 @@ use learned_cat_interfaces::{
     network::{Command, Response},
     schema::Question,
 };
-use learned_cat_interfaces::{Config, Database, Server};
+use learned_cat_interfaces::{Config, Database};
+
+use crate::{ExaminerChannel, Tick};
 
 pub struct Examiner {
     config: Box<dyn Config>,
     db: Box<dyn Database>,
-    srv: Box<dyn Server>,
+    channel: ExaminerChannel,
     /// Хранилище вариантов - username - variants
     variants: HashMap<String, Variant>,
 }
 
 impl Examiner {
-    pub fn new(config: Box<dyn Config>, db: Box<dyn Database>, srv: Box<dyn Server>) -> Examiner {
+    pub fn new(
+        config: Box<dyn Config>,
+        db: Box<dyn Database>,
+        channel: ExaminerChannel,
+    ) -> Examiner {
         let examiner = Examiner {
             config,
             db,
-            srv,
+            channel,
             variants: HashMap::new(),
         };
         examiner
@@ -32,25 +39,26 @@ impl Examiner {
     /// Главный цикл обработки запросов.
     pub fn mainloop(&mut self) {
         loop {
-            match self.srv.pop_request() {
-                Some(request) => {
-                    let response = match request.command {
-                        Command::StartTest | Command::GetNextQuestion => {
-                            self.next_question(&request.user, &request.test)
-                        }
-
-                        Command::GetAvaliableTests => self.avaliable_tests(&request.user),
-
-                        Command::PutAnswer { answer } => {
-                            self.put_answer(&request.user, &request.test, &answer)
-                        }
-                    };
-                    self.srv.push_response(response);
-                }
-                None => {
-                    self.variant_collector();
+            let tick = self.channel.rx.recv().unwrap();
+            match tick {
+                Tick::CollectCompletedTests => self.variant_collector(),
+                Tick::Request { request } => {
+                    let responce = self.serve_request(request);
+                    self.channel.tx.send(responce).unwrap();
                 }
             }
+        }
+    }
+
+    fn serve_request(&mut self, request: Request) -> Response {
+        match request.command {
+            Command::StartTest | Command::GetNextQuestion => {
+                self.next_question(&request.user, &request.test)
+            }
+
+            Command::GetAvaliableTests => self.avaliable_tests(&request.user),
+
+            Command::PutAnswer { answer } => self.put_answer(&request.user, &request.test, &answer),
         }
     }
 
@@ -256,6 +264,7 @@ impl Examiner {
     }
 
     fn variant_collector(&mut self) {
+        println!("Variant collector");
         let mut done_tests = vec![];
 
         for it in &self.variants {
@@ -266,130 +275,130 @@ impl Examiner {
         }
 
         for variant in done_tests {
-            self.done_test(&variant.0, &variant.1);
+            //self.done_test(&variant.0, &variant.1);
         }
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use learned_cat_interfaces::{
-        network,
-        schema::{Answer, Question},
-        settings::{self},
-        Config, Database, Server,
-    };
+// #[cfg(test)]
+// mod tests {
+//     use learned_cat_interfaces::{
+//         network,
+//         schema::{Answer, Question},
+//         settings::{self},
+//         Config, Database, Server,
+//     };
 
-    use super::Examiner;
+//     use super::Examiner;
 
-    struct TDatabase {}
+//     struct TDatabase {}
 
-    #[allow(unused)]
-    impl Database for TDatabase {
-        fn attempts_counter(&mut self, username: &String, testname: &String) -> u32 {
-            2
-        }
+//     #[allow(unused)]
+//     impl Database for TDatabase {
+//         fn attempts_counter(&mut self, username: &String, testname: &String) -> u32 {
+//             2
+//         }
 
-        fn marks(&mut self, username: &String, testname: &String) -> Vec<f32> {
-            vec![3.0, 4.0, 5.0]
-        }
+//         fn marks(&mut self, username: &String, testname: &String) -> Vec<f32> {
+//             vec![3.0, 4.0, 5.0]
+//         }
 
-        /// Сохранить баллы за тест testname для пользователя username.
-        fn append_mark(
-            &mut self,
-            username: &String,
-            testname: &String,
-            mark: f32,
-            start_timestamp: &String,
-            end_timestamp: &String,
-        ) {
-        }
-    }
+//         /// Сохранить баллы за тест testname для пользователя username.
+//         fn append_mark(
+//             &mut self,
+//             username: &String,
+//             testname: &String,
+//             mark: f32,
+//             start_timestamp: &String,
+//             end_timestamp: &String,
+//         ) {
+//         }
+//     }
 
-    struct TServer {}
+//     struct TServer {}
 
-    impl Server for TServer {
-        fn pop_request(&mut self) -> Option<network::Request> {
-            Some(network::Request::new(
-                "user",
-                "test",
-                network::Command::GetNextQuestion,
-            ))
-        }
+//     impl Server for TServer {
+//         fn pop_request(&mut self) -> Option<network::Request> {
+//             Some(network::Request::new(
+//                 "user",
+//                 "test",
+//                 network::Command::GetNextQuestion,
+//             ))
+//         }
 
-        fn push_response(&mut self, response: network::Response) {
-            assert_ne!(response, network::Response::ResponseError);
-        }
-    }
+//         fn push_response(&mut self, response: network::Response) {
+//             assert_ne!(response, network::Response::ResponseError);
+//         }
+//     }
 
-    struct TConfig {}
-    #[allow(unused)]
-    impl Config for TConfig {
-        fn has_user(&self, username: &String) -> bool {
-            true
-        }
+//     struct TConfig {}
+//     #[allow(unused)]
+//     impl Config for TConfig {
+//         fn has_user(&self, username: &String) -> bool {
+//             true
+//         }
 
-        fn has_test(&self, testname: &String) -> bool {
-            true
-        }
+//         fn has_test(&self, testname: &String) -> bool {
+//             true
+//         }
 
-        fn test_settings(&self, testname: &String) -> Option<settings::TestSettings> {
-            Some(settings::TestSettings {
-                caption: "math".to_string(),
-                questions_number: 2,
-                test_duration_minutes: 1,
-                number_of_attempts: 3,
-                show_results: true,
-                allowed_users: vec!["user".to_string()],
-            })
-        }
+//         fn test_settings(&self, testname: &String) -> Option<settings::TestSettings> {
+//             Some(settings::TestSettings {
+//                 caption: "math".to_string(),
+//                 questions_number: 2,
+//                 test_duration_minutes: 1,
+//                 number_of_attempts: 3,
+//                 show_results: true,
+//                 allowed_users: vec!["user".to_string()],
+//             })
+//         }
 
-        fn test_banner(&self, testname: &String) -> Option<String> {
-            Some("description".to_string())
-        }
+//         fn test_banner(&self, testname: &String) -> Option<String> {
+//             Some("description".to_string())
+//         }
 
-        fn question(&self, testname: &String, question_id: usize) -> Option<Question> {
-            Some(Question {
-                question: "text".to_string(),
-                answers: vec!["A".to_string(), "B".to_string()],
-                correct_answer: Answer::new(vec![1, 2, 3]),
-            })
-        }
+//         fn question(&self, testname: &String, question_id: usize) -> Option<Question> {
+//             Some(Question {
+//                 question: "text".to_string(),
+//                 answers: vec!["A".to_string(), "B".to_string()],
+//                 correct_answer: Answer::new(vec![1, 2, 3]),
+//             })
+//         }
 
-        /// Получить количество вопросов в тесте.
-        fn questions_count(&self, testname: &String) -> Option<usize> {
-            Some(1)
-        }
+//         /// Получить количество вопросов в тесте.
+//         fn questions_count(&self, testname: &String) -> Option<usize> {
+//             Some(1)
+//         }
 
-        fn answer(&self, testname: &String, question_id: usize) -> Option<Answer> {
-            Some(Answer::new(vec![1, 2]))
-        }
+//         fn answer(&self, testname: &String, question_id: usize) -> Option<Answer> {
+//             Some(Answer::new(vec![1, 2]))
+//         }
 
-        fn has_access(&self, username: &String, testname: &String) -> bool {
-            true
-        }
+//         fn has_access(&self, username: &String, testname: &String) -> bool {
+//             true
+//         }
 
-        fn user_tests_list(&self, username: &String) -> Vec<String> {
-            vec!["A".to_string(), "B".to_string(), "C".to_string()]
-        }
+//         fn user_tests_list(&self, username: &String) -> Vec<String> {
+//             vec!["A".to_string(), "B".to_string(), "C".to_string()]
+//         }
 
-        fn settings(&self) -> settings::Settings {
-            settings::Settings {
-                tests_directory_path: "example-config".to_string(),
-                result_path: "marks.db".to_string(),
-                server_address: "127.0.0.1:8080".to_string(),
-                tests: vec![self.test_settings(&"math".to_string()).unwrap()],
-                new_file_permissions: 0x660,
-            }
-        }
-    }
-    // #[test]
-    // fn examiner() {
-    //     let config = TConfig {};
-    //     let database = TDatabase {};
-    //     let server = TServer {};
-    //     let mut examiner = Examiner::new(Box::new(config), Box::new(database), Box::new(server));
-    //     //examiner.mainloop();
-    //     //assert!(false);
-    // }
-}
+//         fn settings(&self) -> settings::Settings {
+//             settings::Settings {
+//                 tests_directory_path: "example-config".to_string(),
+//                 result_path: "marks.db".to_string(),
+//                 server_address: "127.0.0.1:8080".to_string(),
+//                 tests: vec![self.test_settings(&"math".to_string()).unwrap()],
+//                 new_file_permissions: 0x660,
+//             }
+//         }
+//     }
+//     // #[test]
+//     // fn examiner() {
+//     //     let config = TConfig {};
+//     //     let database = TDatabase {};
+//     //     let server = TServer {};
+//     //     let mut examiner = Examiner::new(Box::new(config), Box::new(database), Box::new(server));
+//     //     //examiner.mainloop();
+//     //     //assert!(false);
+//     // }
+// }
