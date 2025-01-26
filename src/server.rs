@@ -62,6 +62,7 @@ mod tests {
     };
 
     use super::*;
+    use ntest::timeout;
 
     /// Осуществляет связь с сервером.
     fn send_request(request: &Request, listen: String) -> Result<Response, Box<dyn Error>> {
@@ -104,11 +105,13 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn network_multi_request() {
         let mut srv = SocketServer::new("127.0.0.1:8889".to_string());
 
         thread::spawn(|| {
-            for i in 1..101 {
+            for i in 1..102 {
+                println!("{i}");
                 let req = Request::new(
                     "user",
                     "test",
@@ -130,7 +133,7 @@ mod tests {
         sleep(Duration::from_millis(1));
         let mut i = 0;
         let mut reqq = srv.pop_request();
-        while reqq.is_some() {
+        while reqq.is_some() && i < 100 {
             i += 1;
             let req = Request::new(
                 "user",
@@ -139,6 +142,7 @@ mod tests {
                     answer: Answer::new(vec![i, 2 * i, i * i]),
                 },
             );
+
             assert_eq!(reqq.unwrap(), req);
             let resp = Response::NextQuestion {
                 question: "oops!\ntext.".to_string(),

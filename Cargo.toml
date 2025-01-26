@@ -17,6 +17,7 @@ rustyline = "14.0.0"
 learned-cat-database = { path = "crates/learned-cat-database" }
 learned-cat-interfaces = { path = "crates/learned-cat-interfaces" }
 learned-cat-config = { path = "crates/learned-cat-config" }
+ntest = "0.9.3"
 
 [lib]
 

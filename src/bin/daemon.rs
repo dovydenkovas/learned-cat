@@ -1,11 +1,12 @@
 use clap::arg;
-use learned_cat::examiner::Examiner;
 use learned_cat::server::SocketServer;
+use learned_cat::Controller;
 use learned_cat_database::TestDatabase;
 use std::env::set_current_dir;
 use std::error::Error;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use learned_cat_config::TomlConfig;
 use learned_cat_interfaces::{Config, Statistic};
@@ -40,8 +41,13 @@ fn start_server(path: PathBuf) -> Result<(), Box<dyn Error>> {
     let server = SocketServer::new(config.settings().server_address.clone());
 
     set_daemon_dir(&path).expect("Невозможно перейти в директорию с файлами сервера.");
-    let mut examiner = Examiner::new(Box::new(config), Box::new(database), Box::new(server));
-    examiner.mainloop();
+
+    let mut controller = Controller::new(
+        Box::new(config),
+        Box::new(database),
+        Arc::new(Mutex::new(server)),
+    );
+    controller.run();
     Ok(())
 }
 

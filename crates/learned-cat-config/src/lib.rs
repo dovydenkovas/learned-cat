@@ -82,7 +82,6 @@ impl Config for TomlConfig {
     /// Получить параметры теста testname.
     fn test_settings(&self, testname: &String) -> Option<TestSettings> {
         if self.has_test(testname) {
-            println!("{:?}", self.tests[testname]);
             return Some(self.test_settings[testname].clone());
         }
         None
