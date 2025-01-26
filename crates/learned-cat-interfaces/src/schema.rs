@@ -29,10 +29,9 @@ pub struct Question {
 pub struct Variant {
     pub username: String,
     pub testname: String,
-    pub start_timestamp: Option<chrono::DateTime<chrono::Local>>,
+    pub start_timestamp: chrono::DateTime<chrono::Local>,
     pub questions: Vec<Question>,
     pub answers: Vec<Answer>,
-    pub current_question: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
