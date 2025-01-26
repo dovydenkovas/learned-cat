@@ -125,16 +125,15 @@ impl Statistic for TestDatabase {
             .unwrap();
 
         let mut results = Vec::<TestRecord>::new();
-        println!("{:?}", variants_req);
         for variant in variants_req {
             let start_datetime = chrono::DateTime::parse_from_str(
                 variant.0.start_timestamp.as_str(),
-                "%Y-%m-%d %H:%M:%S %z",
+                "%Y-%m-%d %H:%M:%S.%f %z",
             )
             .unwrap();
             let end_datetime = chrono::DateTime::parse_from_str(
                 variant.0.end_timestamp.as_str(),
-                "%Y-%m-%d %H:%M:%S %z",
+                "%Y-%m-%d %H:%M:%S.%f %z",
             )
             .unwrap();
 
@@ -217,6 +216,8 @@ impl Database for TestDatabase {
 mod db_tests {
     use std::str::FromStr;
 
+    use variants::{end_timestamp, start_timestamp};
+
     use super::*;
 
     #[test]
@@ -245,14 +246,15 @@ mod db_tests {
             &start_time,
             &end_time,
         );
-        let start_time = "2025-01-10 22:10:00 +02:00".to_string();
-        let end_time = "2025-01-10 22:15:00 +02:00".to_string();
+        let start_datetime = "2025-01-26 13:33:41.789001340 +03:00".to_string();
+
+        let end_datetime = "2025-01-26 13:33:44.698762199 +03:00".to_string();
         db.append_mark(
             &"artem".to_string(),
             &"history".to_string(),
             4.83,
-            &start_time,
-            &end_time,
+            &start_datetime,
+            &end_datetime,
         );
         let start_time = "5".to_string();
         let end_time = "6".to_string();
@@ -341,12 +343,16 @@ mod db_tests {
         fill_database(&mut db);
 
         let res = db.results(&"artem".to_string());
-        let start_datetime =
-            chrono::DateTime::parse_from_str("2025-01-10 22:10:00 +02:00", "%Y-%m-%d %H:%M:%S %z")
-                .unwrap();
-        let end_datetime =
-            chrono::DateTime::parse_from_str("2025-01-10 22:15:00 +02:00", "%Y-%m-%d %H:%M:%S %z")
-                .unwrap();
+        let start_datetime = chrono::DateTime::parse_from_str(
+            "2025-01-26 13:33:41.789001340 +03:00",
+            "%Y-%m-%d %H:%M:%S.%f %z",
+        )
+        .unwrap();
+        let end_datetime = chrono::DateTime::parse_from_str(
+            "2025-01-26 13:33:44.698762199 +03:00",
+            "%Y-%m-%d %H:%M:%S.%f %z",
+        )
+        .unwrap();
 
         let expected = vec![TestRecord {
             username: "artem".to_string(),
