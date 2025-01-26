@@ -59,7 +59,7 @@ pub enum Command {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Response {
     AvaliableTests {
-        tests: Vec<String>,
+        tests: Vec<(String, Vec<f32>)>,
     }, // Название теста и результат
     TestStarted {
         banner: String,

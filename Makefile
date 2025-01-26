@@ -8,7 +8,7 @@ install: uninstall all
 	sudo cp learned-cat /usr/bin/learned-cat
 	sudo cp learned-cat-daemon /opt/learned-cat/
 	sudo useradd learnedcat || echo "Пользователь уже существует"
-	sudo chown learnedcat:learnedcat /opt/learned-cat
+	sudo chown learnedcat:learnedcat -R /opt/learned-cat
 	sudo chmod 770 /opt/learned-cat
 
 	@if [[ "systemd" = `ps --no-headers -o comm 1` ]]; then \
@@ -27,3 +27,9 @@ uninstall:
 	sudo rm -rf /opt/learned-cat
 	sudo rm -f /usr/bin/learned-cat
 	sudo userdel -f learnedcat || echo "Пользователь learnedcat не был создан"
+
+update: all
+	sudo cp learned-cat /usr/bin/learned-cat
+	sudo cp learned-cat-daemon /opt/learned-cat/
+
+

@@ -50,90 +50,127 @@ impl Examiner {
         }
     }
 
+    /// Обработать запрос клиента.
     fn serve_request(&mut self, request: Request) -> Response {
         match request.command {
-            Command::StartTest | Command::GetNextQuestion => {
-                self.next_question(&request.user, &request.test)
+            Command::StartTest => self.banner_to_start_test_saved(&request.user, &request.test),
+            Command::GetNextQuestion => self.next_question_saved(&request.user, &request.test),
+            Command::GetAvaliableTests => self.avaliable_tests_saved(&request.user),
+            Command::PutAnswer { answer } => {
+                self.put_answer_saved(&request.user, &request.test, &answer)
             }
+        }
+    }
 
-            Command::GetAvaliableTests => self.avaliable_tests(&request.user),
+    /// Показать описание теста перед запуском
+    fn banner_to_start_test_saved(&mut self, username: &String, testname: &String) -> Response {
+        // У пользователя может не быть доступа.
+        if !self.config.has_access(username, testname) {
+            return Response::NotAllowedUser;
+        }
 
-            Command::PutAnswer { answer } => self.put_answer(&request.user, &request.test, &answer),
+        // Или закончатся попытки.
+        if !self.has_attempt(username, testname) {
+            return Response::End {
+                result: self.db.marks(username, testname),
+            };
+        }
+
+        // Отправить описание теста.
+        Response::TestStarted {
+            banner: self.config.test_banner(testname).unwrap(),
         }
     }
 
     /// Предоставить список доступных тестов.
-    fn avaliable_tests(&self, username: &String) -> Response {
+    fn avaliable_tests_saved(&mut self, username: &String) -> Response {
         if !self.config.has_user(username) {
             Response::NotAllowedUser
         } else {
-            Response::AvaliableTests {
-                tests: self.config.user_tests_list(username),
+            let user_tests = self.config.user_tests_list(username);
+            let mut tests = vec![];
+            for test in &user_tests {
+                tests.push((test.clone(), self.db.marks(username, test)));
             }
+            Response::AvaliableTests { tests }
         }
     }
 
-    /// Сохранить ответ на вопрос.
-    fn put_answer(&mut self, username: &String, testname: &String, answer: &Answer) -> Response {
-        self._put_answer(username, testname, &answer);
-        if self.is_next_question(username, testname) {
-            Response::Ok
+    /// Сохранить ответ на вопрос, отправить следующий вопрос или оценку.
+    fn put_answer_saved(
+        &mut self,
+        username: &String,
+        testname: &String,
+        answer: &Answer,
+    ) -> Response {
+        // У пользователя может не быть доступа.
+        if !self.config.has_access(username, testname) {
+            return Response::NotAllowedUser;
+        }
+        // Тест может быть не запущен
+        if !self.is_user_have_opened_variant(username, testname) {
+            eprintln!(
+                "ERROR: Тест завершен, нельзя отвечать на вопросы: {username}, {testname} {answer:?}"
+            );
+            return Response::End {
+                result: self.db.marks(username, testname),
+            };
+        }
+        self.push_answer_on_current_question(username, &answer);
+        self.next_question_saved(username, testname)
+    }
+
+    /// Запустить тест или отправить новый вопрос.
+    fn next_question_saved(&mut self, username: &String, testname: &String) -> Response {
+        // У пользователя может не быть доступа.
+        if !self.config.has_access(username, testname) {
+            return Response::NotAllowedUser;
+        }
+
+        // Или закончатся попытки.
+        if !self.has_attempt(username, testname) {
+            return Response::End {
+                result: self.db.marks(username, testname),
+            };
+        }
+
+        // Если пользователь ещё не начал тестирование.
+        if !self.is_user_have_opened_variant(username, testname) {
+            self.start_test(username, testname);
+        }
+
+        // Если есть неотвеченные вопросы.
+        if self.is_next_question(username) {
+            self.get_next_question(username)
         } else {
+            self.done_test(username, testname);
             Response::End {
                 result: self.db.marks(username, testname),
             }
         }
     }
 
-    /// Запустить тест или отправить новый вопрос.
-    fn next_question(&mut self, username: &String, testname: &String) -> Response {
-        if !self.config.has_access(username, testname) {
-            return Response::NotAllowedUser;
-        }
+    /// Проверка наличия попыток у пользователя.
+    fn has_attempt(&mut self, username: &String, testname: &String) -> bool {
+        let number_of_attempts = self
+            .config
+            .test_settings(testname)
+            .unwrap()
+            .number_of_attempts;
 
-        if self.db.attempts_counter(username, testname)
-            < self
-                .config
-                .test_settings(testname)
-                .unwrap()
-                .number_of_attempts
-        {
-            return Response::End {
-                result: self.db.marks(username, testname),
-            };
-        }
+        number_of_attempts <= 0 || self.db.attempts_counter(username, testname) < number_of_attempts
+    }
 
-        if self.is_user_have_opened_variant(username, testname) {
-            if self.is_test_time_is_over(username, testname) {
-                self.done_test(username, testname);
-                return Response::End {
-                    result: self.db.marks(username, testname),
-                };
-            } else {
-                return self.get_next_question(username);
-            }
-        }
-
-        self.start_test(username, testname);
-        Response::TestStarted {
-            banner: self.config.test_banner(testname).unwrap(),
-        }
+    /// Есть ли у пользователя незаконченный тест.
+    fn is_user_have_opened_variant(&self, username: &String, testname: &String) -> bool {
+        self.variants.contains_key(username) && &self.variants[username].testname == testname
     }
 
     /// Возвращает первый неотвеченный вопрос.
     fn get_next_question(&mut self, username: &String) -> Response {
-        let variant = self.variants.get_mut(username).unwrap();
-        if variant.start_timestamp.is_none() {
-            variant.start_timestamp = Some(chrono::offset::Local::now());
-        }
-
-        let mut id = variant.current_question;
-        if variant.current_question.is_none() {
-            variant.current_question = Some(0);
-            id = Some(0);
-        }
-
-        let question = variant.questions[id.unwrap()].clone();
+        let variant = &self.variants[username];
+        let id = variant.answers.len();
+        let question = variant.questions[id].clone();
         Response::NextQuestion {
             question: question.question,
             answers: question.answers,
@@ -144,11 +181,6 @@ impl Examiner {
     fn start_test(&mut self, username: &String, testname: &String) {
         let variant = self.generate_variant(username, testname);
         self.create_test_record(username, variant);
-    }
-
-    /// Есть ли у пользователя незаконченный тест.
-    fn is_user_have_opened_variant(&self, username: &String, testname: &String) -> bool {
-        self.variants.contains_key(username) && &self.variants[username].testname == testname
     }
 
     /// Создать вариант теста.
@@ -166,79 +198,42 @@ impl Examiner {
         Variant {
             username: username.clone(),
             testname: testname.clone(),
-            start_timestamp: None,
+            start_timestamp: chrono::offset::Local::now(),
             questions,
             answers: vec![],
-            current_question: None,
         }
     }
 
     /// Запомнить сгенерированный вариант теста.
     fn create_test_record(&mut self, username: &String, variant: Variant) {
-        if self.variants.contains_key(username) {
-            eprintln!("ERROR: User already has opened variant. Skip.");
-        } else {
-            self.variants.insert(username.clone(), variant);
-        }
+        self.variants.insert(username.clone(), variant);
     }
 
     /// Закончилось ли время тестирования?
     fn is_test_time_is_over(&self, username: &String, testname: &String) -> bool {
-        if !self.is_user_have_opened_variant(username, testname) {
-            return false;
-        }
         let test_settings = self.config.test_settings(testname).unwrap();
         let variant = &self.variants[username];
-        if variant.start_timestamp.is_none() {
-            return false;
-        }
 
-        if (chrono::Local::now() - variant.start_timestamp.unwrap())
+        chrono::Local::now() - variant.start_timestamp
             > chrono::Duration::new(test_settings.test_duration_minutes * 60, 0).unwrap()
-        {
-            return true;
-        }
-
-        false
     }
 
     /// Содержит ли вариант ещё неотвеченные вопросы.
-    fn is_next_question(&self, username: &String, testname: &String) -> bool {
-        if self.is_user_have_opened_variant(username, testname) {
-            let current_question = self.variants[username].current_question;
-            if current_question.is_none() {
-                return true;
-            }
-            return current_question.unwrap() < self.variants[username].questions.len();
-        }
-        false
+    fn is_next_question(&self, username: &String) -> bool {
+        let current_question = self.variants[username].answers.len();
+        return current_question < self.variants[username].questions.len();
     }
 
     /// Сохранить ответ пользователя на последний неотвеченный вопрос.
-    fn _put_answer(&mut self, username: &String, testname: &String, answer: &Answer) {
-        if !self.is_user_have_opened_variant(username, testname) {
-            eprintln!("ERROR: Test was done. Ignore put answer.");
-            return;
-        }
-
+    fn push_answer_on_current_question(&mut self, username: &String, answer: &Answer) {
         let variant = self.variants.get_mut(username).unwrap();
-
-        if variant.current_question.is_none() {
-            eprintln!("ERROR: You answer on test that never started.");
-            return;
-        }
-
         variant.answers.push(answer.clone());
-        variant.current_question = Some(variant.current_question.unwrap() + 1);
-        if variant.answers.len() == variant.questions.len() {
-            self.done_test(username, testname)
-        }
     }
 
     /// Завершить тест
     fn done_test(&mut self, username: &String, testname: &String) {
-        let mark = self.calculate_mark(username, testname);
-        let start_time = self.variants[username].start_timestamp.unwrap().to_string();
+        let mark = self.calculate_mark(username);
+        let start_time = self.variants[username].start_timestamp.to_string();
         let end_time = chrono::Local::now().to_string();
         self.db
             .append_mark(username, testname, mark, &start_time, &end_time);
@@ -246,14 +241,8 @@ impl Examiner {
     }
 
     /// Посчитать оценку за тест.
-    fn calculate_mark(&mut self, username: &String, testname: &String) -> f32 {
-        if !self.is_user_have_opened_variant(username, testname) {
-            eprintln!("ERROR: Test wan't run. Ignore calculate mark.");
-            return -1.0;
-        }
-
+    fn calculate_mark(&mut self, username: &String) -> f32 {
         let variant = self.variants.get_mut(username).unwrap();
-        println!("{:?} {:?}", variant.questions, variant.answers);
         let mut result: f32 = 0.0;
         for i in 0..variant.answers.len() {
             if variant.questions[i].correct_answer == variant.answers[i] {
@@ -264,7 +253,6 @@ impl Examiner {
     }
 
     fn variant_collector(&mut self) {
-        println!("Variant collector");
         let mut done_tests = vec![];
 
         for it in &self.variants {
@@ -275,7 +263,7 @@ impl Examiner {
         }
 
         for variant in done_tests {
-            //self.done_test(&variant.0, &variant.1);
+            self.done_test(&variant.0, &variant.1);
         }
     }
 }

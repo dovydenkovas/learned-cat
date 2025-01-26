@@ -206,15 +206,15 @@ fn print_avaliable_tests() {
 }
 
 /// Вывод таблицы ключ-значение
-fn print_table(values: Vec<String>) {
+fn print_table(values: Vec<(String, Vec<f32>)>) {
     let mut max_first = 0;
     for first in &values {
-        max_first = std::cmp::max(max_first, first.len());
+        max_first = std::cmp::max(max_first, first.0.len());
     }
 
     println!("{:>max_first$}   Ваш результат", "Тест");
     for first in &values {
-        println!("{first:>max_first$}");
+        println!("{:>max_first$} {:?}", first.0, first.1);
     }
 }
 
