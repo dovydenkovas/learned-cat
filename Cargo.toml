@@ -28,3 +28,7 @@ path = "src/bin/daemon.rs"
 [[bin]]
 name = "learned-cat"
 path = "src/bin/client.rs"
+
+[[bin]]
+name = "speedometer"
+path = "src/bin/speedometer.rs"

@@ -67,7 +67,7 @@ mod tests {
     /// Осуществляет связь с сервером.
     fn send_request(request: &Request, listen: String) -> Result<Response, Box<dyn Error>> {
         let request = bincode::serialize(&request)?;
-        let mut response = [0 as u8; 5000];
+        let mut response = [0 as u8; 1_000_000];
 
         let mut stream = TcpStream::connect(listen)?;
         stream.write(&request)?;
