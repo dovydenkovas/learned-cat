@@ -35,11 +35,11 @@ pub struct Variant {
     pub current_question: Option<usize>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct TestRecord {
     pub username: String,
     pub testname: String,
     pub mark: f32,
-    pub test_end_timestamp: Option<chrono::DateTime<chrono::Local>>,
-    pub test_begin_timestamp: Option<chrono::DateTime<chrono::Local>>,
+    pub end_datetime: chrono::DateTime<chrono::FixedOffset>,
+    pub start_datetime: chrono::DateTime<chrono::FixedOffset>,
 }

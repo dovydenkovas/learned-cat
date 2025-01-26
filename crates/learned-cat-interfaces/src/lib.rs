@@ -70,5 +70,5 @@ pub trait Statistic {
     fn users(&mut self) -> Vec<String>;
 
     /// Список результатов конкретного пользователя.
-    fn results(&mut self, username: &String) -> TestRecord;
+    fn results(&mut self, username: &String) -> Vec<TestRecord>;
 }

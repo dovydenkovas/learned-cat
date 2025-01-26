@@ -4,13 +4,15 @@ use diesel::{insert_into, prelude::*};
 use dotenvy::dotenv;
 use learned_cat_interfaces::schema::TestRecord;
 use learned_cat_interfaces::Statistic;
-use schema::{Test, User, Variant};
 use std::env;
 use std::process::exit;
 use std::{collections::HashMap, path::PathBuf};
 
 pub mod models;
 pub mod schema;
+
+use crate::models::*;
+use crate::schema::*;
 
 use learned_cat_interfaces::{
     schema::{Answer, Question},
@@ -30,7 +32,7 @@ impl TestDatabase {
         });
 
         diesel::sql_query(
-            r#"CREATE TABLE User (
+            r#"CREATE TABLE users (
             id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
             name VARCHAR NOT NULL
             );"#,
@@ -38,7 +40,7 @@ impl TestDatabase {
         .execute(&mut connection);
         diesel::sql_query(
             r#"
-        CREATE TABLE Test (
+        CREATE TABLE tests (
             id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
             caption VARCHAR NOT NULL
             );"#,
@@ -46,10 +48,10 @@ impl TestDatabase {
         .execute(&mut connection);
         diesel::sql_query(
             r#"
-        CREATE TABLE Variant (
+        CREATE TABLE variants (
             id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-            test INTEGER NOT NULL,
-            user INTEGER NOT NULL,
+            test_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
             mark FLOAT NOT NULL,
             start_timestamp VARCHAR NOT NULL,
             end_timestamp VARCHAR NOT NULL
@@ -61,22 +63,20 @@ impl TestDatabase {
     }
 
     fn append_user(&mut self, username: String) -> i32 {
-        use schema::User::dsl::*;
-
-        let mut user_id = User
-            .filter(name.eq(&username))
-            .select(id)
+        let mut user_id = users::dsl::users
+            .filter(users::name.eq(&username))
+            .select(users::id)
             .get_result::<i32>(&mut self.connection);
 
         if user_id.is_err() {
-            insert_into(User)
-                .values((name.eq(username.clone()),))
+            insert_into(users::table)
+                .values((users::name.eq(username.clone()),))
                 .execute(&mut self.connection)
                 .unwrap();
 
-            user_id = User
-                .filter(name.eq(&username))
-                .select(id)
+            user_id = users::dsl::users
+                .filter(users::name.eq(&username))
+                .select(users::id)
                 .get_result::<i32>(&mut self.connection);
         }
 
@@ -84,22 +84,20 @@ impl TestDatabase {
     }
 
     fn append_test(&mut self, testname: String) -> i32 {
-        use schema::Test::dsl::*;
-
-        let mut test_id = Test
-            .filter(caption.eq(&testname))
-            .select(id)
+        let mut test_id = tests::dsl::tests
+            .filter(tests::caption.eq(&testname))
+            .select(tests::id)
             .get_result::<i32>(&mut self.connection);
 
         if test_id.is_err() {
-            insert_into(Test)
-                .values((caption.eq(testname.clone()),))
+            insert_into(tests::table)
+                .values((tests::caption.eq(testname.clone()),))
                 .execute(&mut self.connection)
                 .unwrap();
 
-            test_id = Test
-                .filter(caption.eq(&testname))
-                .select(id)
+            test_id = tests::dsl::tests
+                .filter(tests::caption.eq(&testname))
+                .select(tests::id)
                 .get_result::<i32>(&mut self.connection);
         }
 
@@ -110,25 +108,58 @@ impl TestDatabase {
 impl Statistic for TestDatabase {
     /// Список пользователей, закончивших хотя бы одну попытку.
     fn users(&mut self) -> Vec<String> {
-        use self::schema::User::dsl::*;
-        User.select(name).load(&mut self.connection).unwrap()
+        users::table
+            .select(users::name)
+            .load(&mut self.connection)
+            .unwrap()
     }
 
     /// Список результатов конкретного пользователя.
-    fn results(&mut self, username: &String) -> TestRecord {
-        unimplemented!()
+    fn results(&mut self, username: &String) -> Vec<TestRecord> {
+        let variants_req = variants::table
+            .inner_join(users::table)
+            .filter(users::name.eq(username))
+            .inner_join(tests::table)
+            .select((Variant::as_select(), User::as_select(), Test::as_select())) //, Test::as_select()))
+            .load::<(Variant, User, Test)>(&mut self.connection)
+            .unwrap();
+
+        let mut results = Vec::<TestRecord>::new();
+        println!("{:?}", variants_req);
+        for variant in variants_req {
+            let start_datetime = chrono::DateTime::parse_from_str(
+                variant.0.start_timestamp.as_str(),
+                "%Y-%m-%d %H:%M:%S %z",
+            )
+            .unwrap();
+            let end_datetime = chrono::DateTime::parse_from_str(
+                variant.0.end_timestamp.as_str(),
+                "%Y-%m-%d %H:%M:%S %z",
+            )
+            .unwrap();
+
+            results.push(TestRecord {
+                username: variant.1.name,
+                testname: variant.2.caption,
+                mark: variant.0.mark,
+                end_datetime,
+                start_datetime,
+            });
+        }
+
+        results
     }
 }
 
 impl Database for TestDatabase {
     /// Сколько попыток для прохождения теста testname потратил пользователь username.
     fn attempts_counter(&mut self, username: &String, testname: &String) -> u32 {
-        Variant::table
-            .left_join(User::table)
-            .filter(User::dsl::name.eq(username))
-            .left_join(Test::table)
-            .filter(Test::dsl::caption.eq(testname))
-            .select(Variant::dsl::start_timestamp)
+        variants::table
+            .left_join(users::table)
+            .filter(users::name.eq(username))
+            .left_join(tests::table)
+            .filter(tests::caption.eq(testname))
+            .select(variants::start_timestamp)
             .count()
             .get_result::<i64>(&mut self.connection)
             .unwrap() as u32
@@ -136,12 +167,12 @@ impl Database for TestDatabase {
 
     /// Получить баллы за тест testname для пользователя username.
     fn marks(&mut self, username: &String, testname: &String) -> Vec<f32> {
-        Variant::table
-            .left_join(User::table)
-            .filter(User::dsl::name.eq(username))
-            .left_join(Test::table)
-            .filter(Test::dsl::caption.eq(testname))
-            .select(Variant::dsl::mark)
+        variants::table
+            .left_join(users::table)
+            .filter(users::name.eq(username))
+            .left_join(tests::table)
+            .filter(tests::caption.eq(testname))
+            .select(variants::mark)
             .load::<f32>(&mut self.connection)
             .unwrap()
     }
@@ -155,28 +186,27 @@ impl Database for TestDatabase {
         start_time: &String,
         end_time: &String,
     ) {
-        use schema::Variant::dsl::*;
-        let user_id = self.append_user(username.clone());
-        let test_id = self.append_test(testname.clone());
+        let user_id_f = self.append_user(username.clone());
+        let test_id_f = self.append_test(testname.clone());
 
-        let mut mark_id = Variant
-            .filter(start_timestamp.eq(&start_time))
-            .filter(end_timestamp.eq(&end_time))
-            .filter(user.eq(user_id))
-            .filter(test.eq(test_id))
-            .select(id)
+        let mut mark_id = variants::dsl::variants
+            .filter(variants::start_timestamp.eq(&start_time))
+            .filter(variants::end_timestamp.eq(&end_time))
+            .filter(variants::user_id.eq(user_id_f))
+            .filter(variants::test_id.eq(test_id_f))
+            .select(variants::id)
             .get_result::<i32>(&mut self.connection);
         if mark_id.is_ok() {
             return;
         }
 
-        insert_into(Variant)
+        insert_into(variants::table)
             .values((
-                user.eq(user_id),
-                test.eq(test_id),
-                mark.eq(mark_value),
-                start_timestamp.eq(start_time.clone()),
-                end_timestamp.eq(end_time.clone()),
+                variants::user_id.eq(user_id_f),
+                variants::test_id.eq(test_id_f),
+                variants::mark.eq(mark_value),
+                variants::start_timestamp.eq(start_time.clone()),
+                variants::end_timestamp.eq(end_time.clone()),
             ))
             .execute(&mut self.connection)
             .unwrap();
@@ -184,7 +214,9 @@ impl Database for TestDatabase {
 }
 
 #[cfg(test)]
-mod tests {
+mod db_tests {
+    use std::str::FromStr;
+
     use super::*;
 
     #[test]
@@ -213,8 +245,8 @@ mod tests {
             &start_time,
             &end_time,
         );
-        let start_time = "3".to_string();
-        let end_time = "4".to_string();
+        let start_time = "2025-01-10 22:10:00 +02:00".to_string();
+        let end_time = "2025-01-10 22:15:00 +02:00".to_string();
         db.append_mark(
             &"artem".to_string(),
             &"history".to_string(),
@@ -296,6 +328,34 @@ mod tests {
             db.attempts_counter(&"artem".to_string(), &"history".to_string()),
             1
         );
+
+        std::fs::remove_file(db_path).unwrap();
+    }
+
+    #[test]
+    fn statistic() {
+        let db_path = "/tmp/lc_statistic.db";
+        let mut db = TestDatabase::new(db_path.to_string());
+
+        assert_eq!(db.results(&"artem".to_string()), vec![] as Vec<TestRecord>);
+        fill_database(&mut db);
+
+        let res = db.results(&"artem".to_string());
+        let start_datetime =
+            chrono::DateTime::parse_from_str("2025-01-10 22:10:00 +02:00", "%Y-%m-%d %H:%M:%S %z")
+                .unwrap();
+        let end_datetime =
+            chrono::DateTime::parse_from_str("2025-01-10 22:15:00 +02:00", "%Y-%m-%d %H:%M:%S %z")
+                .unwrap();
+
+        let expected = vec![TestRecord {
+            username: "artem".to_string(),
+            testname: "history".to_string(),
+            mark: 4.83,
+            start_datetime,
+            end_datetime,
+        }];
+        assert_eq!(res, expected);
 
         std::fs::remove_file(db_path).unwrap();
     }
