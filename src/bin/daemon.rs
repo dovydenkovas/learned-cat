@@ -17,9 +17,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let root_path = get_daemon_dir_path();
     match arguments.subcommand() {
-        Some(("init", _)) => {
-            init::init_server(&root_path)
-        },
         Some(("run", _)) => {
             start_server(root_path)?
         },
@@ -95,13 +92,6 @@ fn get_arguments() -> clap::ArgMatches {
         .version("0.1.0")
         .author("Aleksandr Dovydenkov. <asdovydenkov@gmail.com>")
         .about("Сервер тестирования в терминале. ")
-        .subcommand(
-            clap::Command::new("init")
-                .short_flag('i')
-                .about("создать файлы сервера в каталоге /opt/learned-cat")
-
-                .arg(arg!([postgres_credentials])),
-        )
 
         .subcommand(
             clap::Command::new("run")

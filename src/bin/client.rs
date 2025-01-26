@@ -242,6 +242,6 @@ fn send_request(request: &Request) -> Result<Response, Box<dyn Error>> {
 fn get_server_address() -> String {
     match std::env::var("SERVER_ADDRESS") {
         Ok(val) => val,
-        Err(_) => "127.0.0.1:65001".to_string(),
+        Err(_) => "127.0.0.1:8080".to_string(),
     }
 }
