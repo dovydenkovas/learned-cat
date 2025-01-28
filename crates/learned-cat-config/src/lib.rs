@@ -189,7 +189,6 @@ mod tests {
         let config = load_config();
         assert!(config.has_test(&"python".to_string()));
         assert!(!config.has_test(&"astronomy".to_string()));
-        println!("{:?}", config.test_settings(&"python".to_string()));
         assert_eq!(
             config.test_banner(&"python".to_string()).unwrap(),
             "Предполагается, что все используемые в примерах библиотеки были импортированы."
