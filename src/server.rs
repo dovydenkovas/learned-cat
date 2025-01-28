@@ -7,6 +7,7 @@ use learned_cat_interfaces::{
     network::{self, Request},
     Server,
 };
+use log::info;
 
 pub struct SocketServer {
     listener: TcpListener,
@@ -15,9 +16,8 @@ pub struct SocketServer {
 
 impl SocketServer {
     pub fn new(address: String) -> SocketServer {
-        println!("* Открываю порт сервера: {}", address);
+        info!("Открываю порт сервера: {}", address);
         let listener = TcpListener::bind(address).expect("Не могу открыть соединение");
-        //let _ = listener.set_nonblocking(true);
 
         SocketServer {
             listener,
@@ -76,8 +76,6 @@ mod tests {
         let response = bincode::deserialize::<Response>(&response[..n_bytes])?;
         match response {
             Response::ServerError => {
-                println!("Произошли технические шоколадки :(");
-                println!("Организаторы уже в курсе, попробуйте вернуться к тестированию позже");
                 std::process::exit(1);
             }
 
@@ -111,7 +109,6 @@ mod tests {
 
         thread::spawn(|| {
             for i in 1..102 {
-                println!("{i}");
                 let req = Request::new(
                     "user",
                     "test",

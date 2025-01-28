@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use learned_cat_interfaces::network::Request;
+use log::{debug, error};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
@@ -39,13 +40,15 @@ impl Examiner {
     /// Главный цикл обработки запросов.
     pub fn mainloop(&mut self) {
         loop {
-            let tick = self.channel.rx.recv().unwrap();
-            match tick {
-                Tick::CollectCompletedTests => self.variant_collector(),
-                Tick::Request { request } => {
-                    let responce = self.serve_request(request);
-                    self.channel.tx.send(responce).unwrap();
-                }
+            match self.channel.rx.recv() {
+                Ok(tick) => match tick {
+                    Tick::CollectCompletedTests => self.variant_collector_save(),
+                    Tick::Request { request } => {
+                        let responce = self.serve_request(request);
+                        self.channel.tx.send(responce).unwrap();
+                    }
+                },
+                Err(err) => error!("Ошибка обработки запроса: {:?}.", err),
             }
         }
     }
@@ -66,11 +69,17 @@ impl Examiner {
     fn banner_to_start_test_saved(&mut self, username: &String, testname: &String) -> Response {
         // У пользователя может не быть доступа.
         if !self.config.has_access(username, testname) {
+            debug!(
+                "Пользователь {username} пытался запустить тест {testname} не имея не это прав."
+            );
             return Response::NotAllowedUser;
         }
 
         // Или закончатся попытки.
         if !self.has_attempt(username, testname) {
+            debug!(
+                "У пользователя {username} больше не осталось попыток на прохождение {testname}."
+            );
             return Response::End {
                 result: self.db.marks(username, testname),
             };
@@ -78,13 +87,14 @@ impl Examiner {
 
         // Отправить описание теста.
         Response::TestStarted {
-            banner: self.config.test_banner(testname).unwrap(),
+            banner: self.config.test_banner(testname).unwrap_or("".to_string()),
         }
     }
 
     /// Предоставить список доступных тестов.
     fn avaliable_tests_saved(&mut self, username: &String) -> Response {
         if !self.config.has_user(username) {
+            error!("Пользователя {username} не существует.");
             Response::NotAllowedUser
         } else {
             let user_tests = self.config.user_tests_list(username);
@@ -105,13 +115,14 @@ impl Examiner {
     ) -> Response {
         // У пользователя может не быть доступа.
         if !self.config.has_access(username, testname) {
+            error!(
+                "Пользователь {username} пытался ответить на вопрос теста {testname} не имея не это прав."
+            );
             return Response::NotAllowedUser;
         }
         // Тест может быть не запущен
         if !self.is_user_have_opened_variant(username, testname) {
-            eprintln!(
-                "ERROR: Тест завершен, нельзя отвечать на вопросы: {username}, {testname} {answer:?}"
-            );
+            error!("Тест завершен, нельзя отвечать на вопросы: {username}, {testname} {answer:?}");
             return Response::End {
                 result: self.db.marks(username, testname),
             };
@@ -124,11 +135,17 @@ impl Examiner {
     fn next_question_saved(&mut self, username: &String, testname: &String) -> Response {
         // У пользователя может не быть доступа.
         if !self.config.has_access(username, testname) {
+            error!(
+                "Пользователь {username} пытался получить следующий вопрос {testname} не имея доступа к тесту."
+            );
             return Response::NotAllowedUser;
         }
 
         // Или закончатся попытки.
         if !self.has_attempt(username, testname) {
+            debug!(
+                "У пользователя {username} больше не осталось попыток на прохождение {testname}."
+            );
             return Response::End {
                 result: self.db.marks(username, testname),
             };
@@ -152,11 +169,13 @@ impl Examiner {
 
     /// Проверка наличия попыток у пользователя.
     fn has_attempt(&mut self, username: &String, testname: &String) -> bool {
-        let number_of_attempts = self
-            .config
-            .test_settings(testname)
-            .unwrap()
-            .number_of_attempts;
+        let number_of_attempts = match self.config.test_settings(testname) {
+            Some(conf) => conf.number_of_attempts,
+            None => {
+                error!("Тест {testname} требуемый пользователем {username} не обнаружен");
+                0
+            }
+        };
 
         number_of_attempts <= 0 || self.db.attempts_counter(username, testname) < number_of_attempts
     }
@@ -181,6 +200,7 @@ impl Examiner {
     fn start_test(&mut self, username: &String, testname: &String) {
         let variant = self.generate_variant(username, testname);
         self.create_test_record(username, variant);
+        debug!("Пользователь {username} начал тестирование {testname}.");
     }
 
     /// Создать вариант теста.
@@ -237,6 +257,10 @@ impl Examiner {
         let end_time = chrono::Local::now().to_string();
         self.db
             .append_mark(username, testname, mark, &start_time, &end_time);
+        debug!(
+            "Пользователь {username} завершил тест {testname}: {:?}.",
+            self.variants[username]
+        );
         self.variants.remove(username);
     }
 
@@ -252,7 +276,7 @@ impl Examiner {
         result
     }
 
-    fn variant_collector(&mut self) {
+    fn variant_collector_save(&mut self) {
         let mut done_tests = vec![];
 
         for it in &self.variants {

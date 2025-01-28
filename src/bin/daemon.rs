@@ -2,11 +2,16 @@ use clap::arg;
 use learned_cat::server::SocketServer;
 use learned_cat::Controller;
 use learned_cat_database::TestDatabase;
+use log4rs::append::{console::ConsoleAppender, file::FileAppender};
+use log4rs::config::{Appender, Root};
+use log4rs::encode::pattern::PatternEncoder;
 use std::env::set_current_dir;
 use std::error::Error;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+
+use log::{debug, error};
 
 use learned_cat_config::TomlConfig;
 use learned_cat_interfaces::{Config, Statistic};
@@ -26,27 +31,60 @@ fn main() -> Result<(), Box<dyn Error>> {
                              .to_string();
             export_results(root_path, output_filename)?
         },
-        Some((&_, _)) => eprintln!("Неизвестная команда."),
-        None => eprintln!("Необходимо указать команду. Для просмотра доступных команд используйте переметр --help"),
+        Some((&_, _)) => error!("Неизвестная команда."),
+        None => error!("Необходимо указать команду. Для просмотра доступных команд используйте переметр --help"),
     };
     Ok(())
 }
 
+fn start_logger() {
+    let logconsole = ConsoleAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(
+            "[{d(%Y-%m-%d %H:%M:%S)} {h({l})}]: {M} - {m}\n",
+        )))
+        .build();
+
+    let logfile = FileAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(
+            "[{d(%Y-%m-%d %H:%M:%S)} {l}]: {M} - {m}\n",
+        )))
+        .build("log/output.log")
+        .unwrap();
+
+    let config = log4rs::Config::builder()
+        .appender(Appender::builder().build("logfile", Box::new(logfile)))
+        .appender(Appender::builder().build("logconsole", Box::new(logconsole)))
+        .build(
+            Root::builder()
+                .appender("logconsole")
+                .appender("logfile")
+                .build(log::LevelFilter::Info),
+        )
+        .unwrap();
+
+    log4rs::init_config(config).unwrap();
+}
+
 /// Запуск сервера.
 fn start_server(path: PathBuf) -> Result<(), Box<dyn Error>> {
+    start_logger();
+    set_daemon_dir(&path).expect("Невозможно перейти в директорию с файлами сервера.");
+    debug!("Считываю настройки.");
     let config = TomlConfig::new(&path)?;
-
+    debug!("Открываю базу данных.");
     let tests_path = Path::new(&path).join(&config.settings().result_path.clone());
     let database = TestDatabase::new(tests_path.to_str().unwrap().to_string());
+    debug!("Запуска сервер.");
     let server = SocketServer::new(config.settings().server_address.clone());
 
-    set_daemon_dir(&path).expect("Невозможно перейти в директорию с файлами сервера.");
-
+    debug!("Подготовка всех систем.");
     let mut controller = Controller::new(
         Box::new(config),
         Box::new(database),
         Arc::new(Mutex::new(server)),
     );
+
+    debug!("Запуск.");
     controller.run();
     Ok(())
 }
@@ -63,7 +101,7 @@ fn export_results(root_path: PathBuf, output_filename: String) -> Result<(), Box
     let mut file = match std::fs::File::create(output_filename.clone()) {
         Ok(f) => f,
         Err(err) => {
-            eprintln!("Не могу создать файл {output_filename}: {err}");
+            error!("Не могу создать файл {output_filename}: {err}");
             std::process::exit(1);
         }
     };
@@ -80,9 +118,10 @@ fn export_results(root_path: PathBuf, output_filename: String) -> Result<(), Box
                 result.mark
             );
 
-            println!("{}", out);
+            print!("{}", out);
             let _ = file.write(out.as_bytes());
         }
+        println!();
     }
 
     Ok(())
@@ -122,11 +161,11 @@ fn daemon_dir_path() -> PathBuf {
 /// Перейти в директорию с файлами сервера
 fn set_daemon_dir<P: AsRef<Path>>(path: P) -> Result<(), Box<dyn Error>> {
     if set_current_dir(path.as_ref()).is_err() {
-        eprintln!(
+        error!(
             "Ошибка доступа к каталогу сервера {}.",
             path.as_ref().to_str().unwrap()
         );
-        eprintln!("Проверьте, что каталог существует, и у процесса есть у нему доступ.");
+        error!("Проверьте, что каталог существует, и у процесса есть у нему доступ.");
         return Err(Box::new(std::fmt::Error));
     }
     Ok(())

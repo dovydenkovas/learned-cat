@@ -4,6 +4,7 @@ use diesel::{insert_into, prelude::*};
 use dotenvy::dotenv;
 use learned_cat_interfaces::schema::TestRecord;
 use learned_cat_interfaces::Statistic;
+use log::error;
 use std::env;
 use std::process::exit;
 use std::{collections::HashMap, path::PathBuf};
@@ -27,7 +28,7 @@ pub struct TestDatabase {
 impl TestDatabase {
     pub fn new(database_url: String) -> TestDatabase {
         let mut connection = SqliteConnection::establish(&database_url).unwrap_or_else(|_| {
-            eprintln!("Невозможно открыть Sqlite базу данных {}.", database_url);
+            error!("Невозможно открыть Sqlite базу данных {}.", database_url);
             exit(1)
         });
 
