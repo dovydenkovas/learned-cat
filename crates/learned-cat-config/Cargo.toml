@@ -1,0 +1,10 @@
+[package]
+name = "learned-cat-config"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "^1.0.197", features = ["derive"] }
+toml = { version = "^0.8.10", features = ["display"] }
+chrono = { version = "^0.4.35", features = ["serde"] }
+learned-cat-interfaces = { path = "../learned-cat-interfaces" }

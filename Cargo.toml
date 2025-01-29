@@ -14,12 +14,24 @@ toml = { version = "^0.8.10", features = ["display"] }
 rand = "0.8.5"
 walkdir = "2.5.0"
 rustyline = "14.0.0"
+learned-cat-database = { path = "crates/learned-cat-database" }
+learned-cat-interfaces = { path = "crates/learned-cat-interfaces" }
+learned-cat-config = { path = "crates/learned-cat-config" }
+ntest = "0.9.3"
+log = "0.4.25"
+env_logger = "0.11.6"
+log4rs = "1.3.0"
 
+[lib]
 
 [[bin]]
 name = "learned-cat-daemon"
-path = "src/daemon.rs"
+path = "src/bin/daemon.rs"
 
 [[bin]]
 name = "learned-cat"
-path = "src/client.rs"
+path = "src/bin/client.rs"
+
+[[bin]]
+name = "speedometer"
+path = "src/bin/speedometer.rs"
