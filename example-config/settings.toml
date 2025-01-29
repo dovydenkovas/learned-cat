@@ -1,18 +1,18 @@
 tests_directory_path = "tests"
-result_path = "results"
-server_address = "127.0.0.1:65001"
+result_path = "marks.db"
+server_address = "127.0.0.1:8080"
 
 [[test]]
-caption="linux"
+caption = "linux"
 questions_number = 2
 test_duration_minutes = 5
 show_results = true
-allowed_users = ["asd"]
+allowed_users = ["asd", "student"]
 number_of_attempts = 3
 
 
 [[test]]
-caption="python"
+caption = "python"
 questions_number = 2
 test_duration_minutes = 5
 show_results = true
@@ -20,3 +20,10 @@ allowed_users = ["asd"]
 number_of_attempts = 1
 
 
+[[test]]
+caption = "algo"
+questions_number = 10
+test_duration_minutes = 15
+show_results = true
+allowed_users = ["asd"]
+number_of_attempts = 0

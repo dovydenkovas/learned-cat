@@ -3,7 +3,10 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::Path;
 
-use crate::model::{Question, Test};
+use learned_cat_interfaces::schema::Answer;
+use learned_cat_interfaces::schema::Question;
+use learned_cat_interfaces::settings::Test;
+use learned_cat_interfaces::settings::TestSettings;
 
 enum ParseState {
     TestBanner,
@@ -12,7 +15,7 @@ enum ParseState {
 }
 
 /// Парсит Markdown файл тестирования
-pub fn read_test(path: &Path, test: &mut Test) {
+pub fn read_test(path: &Path) -> Test {
     let file = File::open(path).expect(format!("Не могу открыть файл теста: {:?}", path).as_str());
     let file = BufReader::new(file);
 
@@ -23,7 +26,7 @@ pub fn read_test(path: &Path, test: &mut Test) {
     let mut question = Question {
         question: "".to_string(),
         answers: vec![],
-        correct_answers: vec![],
+        correct_answer: Answer::new(vec![]),
     };
 
     let mut state = ParseState::TestBanner;
@@ -41,7 +44,7 @@ pub fn read_test(path: &Path, test: &mut Test) {
             }
 
             ParseState::ReadQuestion => {
-                if line.starts_with("*") || line.starts_with("+") {
+                if line.starts_with("*") || line.starts_with("+") || line.starts_with("-") {
                     state = ParseState::ReadAnswer;
                 }
             }
@@ -56,9 +59,8 @@ pub fn read_test(path: &Path, test: &mut Test) {
                     question = Question {
                         question: "".to_string(),
                         answers: vec![],
-                        correct_answers: vec![],
+                        correct_answer: Answer::new(vec![]),
                     };
-
                     answer_number = 0;
                 }
             }
@@ -70,14 +72,14 @@ pub fn read_test(path: &Path, test: &mut Test) {
             }
 
             ParseState::ReadAnswer => {
-                if line.starts_with("*") {
+                if line.starts_with("*") || line.starts_with("-") {
                     // answer
                     question.answers.push(line[1..].trim().to_string());
                     answer_number += 1;
                 } else if line.starts_with("+") {
                     // true answer
                     question.answers.push(line[1..].trim().to_string());
-                    question.correct_answers.push(answer_number);
+                    question.correct_answer.push(answer_number);
                     answer_number += 1;
                 } else {
                     // multiline answer
@@ -97,36 +99,5 @@ pub fn read_test(path: &Path, test: &mut Test) {
         questions.push(question);
     }
 
-    test.banner = banner;
-    test.questions = questions;
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parsetest_few_questions_test() {
-        // TODO
-    }
-
-    #[test]
-    fn parsetest_one_answer_test() {
-        // TODO
-    }
-
-    #[test]
-    fn parsetest_few_answers_test() {
-        // TODO
-    }
-
-    #[test]
-    fn parsetest_open_questions_test() {
-        // TODO
-    }
-
-    #[test]
-    fn parsetest_parse_error_test() {
-        // TODO
-    }
+    Test { banner, questions }
 }

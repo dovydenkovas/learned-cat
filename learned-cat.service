@@ -1,0 +1,13 @@
+[Unit]
+Description=Daemon for learned-cat server.
+After=network.target
+
+[Service]
+User=learnedcat
+Group=learnedcat
+WorkingDirectory=/opt/learned-cat
+ExecStart=/opt/learned-cat/learned-cat-daemon -r
+
+
+[Install]
+WantedBy=multi-user.target

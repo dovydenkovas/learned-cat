@@ -28,7 +28,9 @@
 /// <- Response:ResponseError - некорректный запрос
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+use crate::schema::Answer;
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Request {
     pub user: String,
     pub test: String,
@@ -51,13 +53,13 @@ pub enum Command {
     GetAvaliableTests,
     StartTest,
     GetNextQuestion,
-    PutAnswer { answer: Vec<usize> },
+    PutAnswer { answer: Answer },
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Response {
     AvaliableTests {
-        tests: Vec<(String, String)>,
+        tests: Vec<(String, Vec<f32>)>,
     }, // Название теста и результат
     TestStarted {
         banner: String,
@@ -68,7 +70,7 @@ pub enum Response {
     },
     Ok,
     End {
-        result: String,
+        result: Vec<f32>,
     },
     NotAllowedUser,
     ServerError,

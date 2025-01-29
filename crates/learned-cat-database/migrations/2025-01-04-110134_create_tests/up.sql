@@ -1,0 +1,19 @@
+-- Your SQL goes here
+CREATE TABLE users (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR NOT NULL
+);
+
+CREATE TABLE tests (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    caption VARCHAR NOT NULL
+);
+
+CREATE TABLE variants (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    test_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    mark FLOAT NOT NULL,
+    start_timestamp VARCHAR NOT NULL,
+    end_timestamp VARCHAR NOT NULL
+);

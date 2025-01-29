@@ -8,8 +8,10 @@ use clap::Parser;
 use rustyline::DefaultEditor;
 use whoami;
 
-mod network;
-use network::{Command, Request, Response};
+use learned_cat_interfaces::{
+    network::{Command, Request, Response},
+    schema::Answer,
+};
 
 /// Структура аргументов командной строки.
 #[derive(Parser)]
@@ -56,7 +58,7 @@ fn start_test(test_name: String) {
             ),
 
             Response::End { result } => {
-                println!("Тест завершен. Ваш результат: {}", result);
+                println!("Тест завершен. Ваш результат: {:?}", result);
             }
 
             _ => eprintln!("Теста не существует или доступ к нему закрыт."),
@@ -108,13 +110,19 @@ fn run_test(test_name: String, next_question: Option<Response>) {
                 let put_answer_request = Request::new(
                     whoami::username(),
                     test_name.clone(),
-                    Command::PutAnswer { answer: answers },
+                    Command::PutAnswer {
+                        answer: Answer::new(answers),
+                    },
                 );
 
                 match send_request(&put_answer_request) {
                     Ok(Response::End { result }) => {
-                        println!("Тест завершен. Ваш результат: {}", result);
+                        println!("Тест завершен. Ваш результат: {:?}", result);
                         break;
+                    }
+
+                    Ok(Response::NextQuestion { question, answers }) => {
+                        next_question = Some(Response::NextQuestion { question, answers })
                     }
 
                     _ => (),
@@ -122,7 +130,7 @@ fn run_test(test_name: String, next_question: Option<Response>) {
             }
 
             Ok(Response::End { result }) => {
-                println!("Тест завершен. Ваш результат: {}", result);
+                println!("Тест завершен. Ваш результат: {:?}", result);
                 break;
             }
 
@@ -202,22 +210,22 @@ fn print_avaliable_tests() {
 }
 
 /// Вывод таблицы ключ-значение
-fn print_table(values: Vec<(String, String)>) {
+fn print_table(values: Vec<(String, Vec<f32>)>) {
     let mut max_first = 0;
-    for (first, _) in &values {
-        max_first = std::cmp::max(max_first, first.len());
+    for first in &values {
+        max_first = std::cmp::max(max_first, first.0.len());
     }
 
     println!("{:>max_first$}   Ваш результат", "Тест");
-    for (first, second) in &values {
-        println!("{first:>max_first$}   {second:>6}");
+    for first in &values {
+        println!("{:>max_first$} {:?}", first.0, first.1);
     }
 }
 
 /// Осуществляет связь с сервером.
 fn send_request(request: &Request) -> Result<Response, Box<dyn Error>> {
     let request = bincode::serialize(&request)?;
-    let mut response = [0 as u8; 5000];
+    let mut response = [0 as u8; 1_000_000];
 
     let mut stream = TcpStream::connect(get_server_address())?;
     stream.write(&request)?;
@@ -238,6 +246,6 @@ fn send_request(request: &Request) -> Result<Response, Box<dyn Error>> {
 fn get_server_address() -> String {
     match std::env::var("SERVER_ADDRESS") {
         Ok(val) => val,
-        Err(_) => "127.0.0.1:65001".to_string(),
+        Err(_) => "127.0.0.1:8080".to_string(),
     }
 }
