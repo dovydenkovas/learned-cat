@@ -58,7 +58,7 @@ fn start_logger() {
             Root::builder()
                 .appender("logconsole")
                 .appender("logfile")
-                .build(log::LevelFilter::Info),
+                .build(log::LevelFilter::Debug),
         )
         .unwrap();
 
