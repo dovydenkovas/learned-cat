@@ -1,14 +1,15 @@
-tests_directory_path = "tests"
-result_path = "marks.db"
-server_address = "127.0.0.1:8080"
+tests_directory_path = "tests"    # Путь к каталогу с файлами тестов
+result_path = "marks.db"          # Путь файла базы данных
+server_address = "127.0.0.1:8080" # Адрес сервера тестирования.
 
 [[test]]
-caption = "linux"
-questions_number = 2
-test_duration_minutes = 5
-show_results = true
+caption = "linux"         # Название теста (необходимо для запуска теста и поиска файла теста)
+questions_number = 2      # Количество вопросов, которые необходимо выбрать для генерации варианта
+test_duration_minutes = 5 # Ограничение тестирования по времени
+show_results = true       # Показывать ли баллы пользователю
+# Имена пользователей, имеющих право выполнять тест
 allowed_users = ["asd", "student"]
-number_of_attempts = 3
+number_of_attempts = 3             # Разрешенное количество попыток
 
 
 [[test]]

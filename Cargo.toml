@@ -1,6 +1,6 @@
 [package]
 name = "learned-cat"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 
 
@@ -14,13 +14,19 @@ toml = { version = "^0.8.10", features = ["display"] }
 rand = "0.8.5"
 walkdir = "2.5.0"
 rustyline = "14.0.0"
-learned-cat-database = { path = "crates/learned-cat-database" }
-learned-cat-interfaces = { path = "crates/learned-cat-interfaces" }
-learned-cat-config = { path = "crates/learned-cat-config" }
 ntest = "0.9.3"
 log = "0.4.25"
 env_logger = "0.11.6"
 log4rs = "1.3.0"
+
+[dependencies.learned-cat-database]
+path = "crates/learned-cat-database"
+
+[dependencies.learned-cat-interfaces]
+path = "crates/learned-cat-interfaces"
+
+[dependencies.learned-cat-config]
+path = "crates/learned-cat-config"
 
 [lib]
 
