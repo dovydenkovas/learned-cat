@@ -15,8 +15,7 @@ use toml::from_str;
 
 mod parsetest;
 
-use learned_cat_interfaces::{
-    self,
+use lc_examiner::{
     schema::{Answer, Question},
     settings::{Settings, Test, TestSettings},
     Config,

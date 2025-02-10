@@ -3,10 +3,10 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::Path;
 
-use learned_cat_interfaces::schema::Answer;
-use learned_cat_interfaces::schema::Question;
-use learned_cat_interfaces::settings::Test;
-use learned_cat_interfaces::settings::TestSettings;
+use lc_examiner::schema::Answer;
+use lc_examiner::schema::Question;
+use lc_examiner::settings::Test;
+use lc_examiner::settings::TestSettings;
 
 enum ParseState {
     TestBanner,

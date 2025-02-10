@@ -33,12 +33,3 @@ pub struct Variant {
     pub questions: Vec<Question>,
     pub answers: Vec<Answer>,
 }
-
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
-pub struct TestRecord {
-    pub username: String,
-    pub testname: String,
-    pub mark: f32,
-    pub end_datetime: chrono::DateTime<chrono::FixedOffset>,
-    pub start_datetime: chrono::DateTime<chrono::FixedOffset>,
-}

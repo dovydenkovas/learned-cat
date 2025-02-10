@@ -7,11 +7,9 @@ edition = "2021"
 [dependencies]
 clap = { version = "^4.5.2", features = ["derive"] }
 whoami = "^1.4.0"
-serde = { version = "^1.0.197", features = ["derive"] }
 bincode = "^1.3.3"
 chrono = { version = "^0.4.35", features = ["serde"] }
-toml = { version = "^0.8.10", features = ["display"] }
-rand = "0.8.5"
+serde = { version = "^1.0.197", features = ["derive"] }
 walkdir = "2.5.0"
 rustyline = "14.0.0"
 ntest = "0.9.3"
@@ -19,25 +17,33 @@ log = "0.4.25"
 env_logger = "0.11.6"
 log4rs = "1.3.0"
 
-[dependencies.learned-cat-database]
-path = "crates/learned-cat-database"
+[dependencies.lc-examiner]
+path = "crates/lc-examiner"
 
-[dependencies.learned-cat-interfaces]
-path = "crates/learned-cat-interfaces"
+[dependencies.lc-exammanager]
+path = "crates/lc-exammanager"
 
-[dependencies.learned-cat-config]
-path = "crates/learned-cat-config"
+[dependencies.lc-database]
+path = "crates/lc-database"
 
-[lib]
+[dependencies.lc-config]
+path = "crates/lc-config"
+
+[dependencies.lc-reporter]
+path = "crates/lc-reporter"
+
+[dependencies.lc-server]
+path = "crates/lc-server"
+
 
 [[bin]]
 name = "learned-cat-daemon"
-path = "src/bin/daemon.rs"
+path = "src/daemon.rs"
 
 [[bin]]
 name = "learned-cat"
-path = "src/bin/client.rs"
+path = "src/client.rs"
 
 [[bin]]
 name = "speedometer"
-path = "src/bin/speedometer.rs"
+path = "src/speedometer.rs"

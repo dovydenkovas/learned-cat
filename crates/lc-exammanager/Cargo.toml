@@ -1,0 +1,8 @@
+[package]
+name = "lc-exammanager"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lc-examiner = { path = "../lc-examiner" }
+log = "0.4.25"

@@ -3,11 +3,9 @@ use std::{
     net::{TcpListener, TcpStream},
 };
 
-use learned_cat_interfaces::{
-    network::{self, Request},
-    Server,
-};
-use log::info;
+use lc_examiner::network;
+use lc_exammanager::Server;
+use log::{debug, info};
 
 pub struct SocketServer {
     listener: TcpListener,
@@ -33,12 +31,14 @@ impl Server for SocketServer {
             Ok((mut stream, _)) => {
                 let mut request = [0 as u8; 5000];
                 let n_bytes = stream.read(&mut request).unwrap();
-                let request = bincode::deserialize::<Request>(&request[0..n_bytes]).unwrap();
+                let request =
+                    bincode::deserialize::<network::Request>(&request[0..n_bytes]).unwrap();
 
                 self.stream = Some(stream);
+                debug!("{request:?}");
                 Some(request)
             }
-            Err(_) => return None,
+            Err(_) => None,
         }
     }
 

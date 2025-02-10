@@ -1,13 +1,7 @@
-#![allow(unused)]
-
 use diesel::{insert_into, prelude::*};
-use dotenvy::dotenv;
-use learned_cat_interfaces::schema::TestRecord;
-use learned_cat_interfaces::Statistic;
+use lc_reporter::{Statistic, TestRecord};
 use log::error;
-use std::env;
 use std::process::exit;
-use std::{collections::HashMap, path::PathBuf};
 
 pub mod models;
 pub mod schema;
@@ -15,11 +9,7 @@ pub mod schema;
 use crate::models::*;
 use crate::schema::*;
 
-use learned_cat_interfaces::{
-    schema::{Answer, Question},
-    settings::{Settings, TestSettings},
-    Database,
-};
+use lc_examiner::Database;
 
 pub struct TestDatabase {
     connection: SqliteConnection,
@@ -32,14 +22,15 @@ impl TestDatabase {
             exit(1)
         });
 
-        diesel::sql_query(
+        let _ = diesel::sql_query(
             r#"CREATE TABLE users (
             id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
             name VARCHAR NOT NULL
             );"#,
         )
         .execute(&mut connection);
-        diesel::sql_query(
+
+        let _ = diesel::sql_query(
             r#"
         CREATE TABLE tests (
             id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +38,8 @@ impl TestDatabase {
             );"#,
         )
         .execute(&mut connection);
-        diesel::sql_query(
+
+        let _ = diesel::sql_query(
             r#"
         CREATE TABLE variants (
             id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
@@ -189,7 +181,7 @@ impl Database for TestDatabase {
         let user_id_f = self.append_user(username.clone());
         let test_id_f = self.append_test(testname.clone());
 
-        let mut mark_id = variants::dsl::variants
+        let mark_id = variants::dsl::variants
             .filter(variants::start_timestamp.eq(&start_time))
             .filter(variants::end_timestamp.eq(&end_time))
             .filter(variants::user_id.eq(user_id_f))

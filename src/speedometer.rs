@@ -7,7 +7,7 @@ use std::{error::Error, thread};
 
 use whoami;
 
-use learned_cat_interfaces::{
+use lc_examiner::{
     network::{Command, Request, Response},
     schema::Answer,
 };

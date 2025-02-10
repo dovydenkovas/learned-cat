@@ -1,20 +1,21 @@
 use clap::arg;
-use learned_cat::server::SocketServer;
-use learned_cat::Controller;
-use learned_cat_database::TestDatabase;
+use lc_database::TestDatabase;
+use lc_exammanager::exammanager::ExamManager;
+use lc_reporter::Reporter;
+use lc_server::socketserver::SocketServer;
 use log4rs::append::{console::ConsoleAppender, file::FileAppender};
 use log4rs::config::{Appender, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use std::env::set_current_dir;
 use std::error::Error;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use log::{debug, error};
 
-use learned_cat_config::TomlConfig;
-use learned_cat_interfaces::{Config, Statistic};
+use lc_config::TomlConfig;
+use lc_examiner::Config;
+use lc_reporter::Statistic;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = arguments();
@@ -25,10 +26,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             start_server(root_path)?
         },
         Some(("export-results", args)) => {
-            let output_filename = args.get_one::<String>("filename")
+            let output_filename = PathBuf::from(args.get_one::<String>("filename")
                              .or(Some(&"output.csv".to_string()))
-                             .unwrap()
-                             .to_string();
+                             .unwrap());
             export_results(root_path, output_filename)?
         },
         Some((&_, _)) => error!("Неизвестная команда."),
@@ -37,6 +37,46 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn export_results(root_path: PathBuf, output_filename: PathBuf) -> Result<(), Box<dyn Error>> {
+    // Load Statistic
+    let config = TomlConfig::new(&root_path).unwrap();
+    let tests_path = Path::new(&root_path).join(&config.settings().result_path.clone());
+    let statistic: Box<dyn Statistic> =
+        Box::new(TestDatabase::new(tests_path.to_str().unwrap().to_string()));
+
+    let mut reporter: Box<dyn Reporter> =
+        Box::new(lc_reporter::csv_reporter::CsvReporter::new(statistic));
+
+    reporter.save_report(output_filename);
+
+    Ok(())
+}
+
+/// Запуск сервера.
+fn start_server(path: PathBuf) -> Result<(), Box<dyn Error>> {
+    start_logger();
+    set_daemon_dir(&path).expect("Невозможно перейти в директорию с файлами сервера.");
+    debug!("Считываю настройки.");
+    let config = TomlConfig::new(&path)?;
+    debug!("Открываю базу данных.");
+    let tests_path = Path::new(&path).join(&config.settings().result_path.clone());
+    let database = TestDatabase::new(tests_path.to_str().unwrap().to_string());
+    debug!("Запуска сервер.");
+    let server = SocketServer::new(config.settings().server_address.clone());
+
+    debug!("Подготовка всех систем.");
+    let mut controller = ExamManager::new(
+        Box::new(config),
+        Box::new(database),
+        Arc::new(Mutex::new(server)),
+    );
+
+    debug!("Запуск.");
+    controller.run();
+    Ok(())
+}
+
+/// Настройка и запуск логирования
 fn start_logger() {
     let logconsole = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
@@ -63,68 +103,6 @@ fn start_logger() {
         .unwrap();
 
     log4rs::init_config(config).unwrap();
-}
-
-/// Запуск сервера.
-fn start_server(path: PathBuf) -> Result<(), Box<dyn Error>> {
-    start_logger();
-    set_daemon_dir(&path).expect("Невозможно перейти в директорию с файлами сервера.");
-    debug!("Считываю настройки.");
-    let config = TomlConfig::new(&path)?;
-    debug!("Открываю базу данных.");
-    let tests_path = Path::new(&path).join(&config.settings().result_path.clone());
-    let database = TestDatabase::new(tests_path.to_str().unwrap().to_string());
-    debug!("Запуска сервер.");
-    let server = SocketServer::new(config.settings().server_address.clone());
-
-    debug!("Подготовка всех систем.");
-    let mut controller = Controller::new(
-        Box::new(config),
-        Box::new(database),
-        Arc::new(Mutex::new(server)),
-    );
-
-    debug!("Запуск.");
-    controller.run();
-    Ok(())
-}
-
-/// Сохранение результатов тестирования в файл.
-fn export_results(root_path: PathBuf, output_filename: String) -> Result<(), Box<dyn Error>> {
-    // Load Statistic
-    let config = TomlConfig::new(&root_path)?;
-    let tests_path = Path::new(&root_path).join(&config.settings().result_path.clone());
-    let mut statistic: Box<dyn Statistic> =
-        Box::new(TestDatabase::new(tests_path.to_str().unwrap().to_string()));
-
-    // Create output file
-    let mut file = match std::fs::File::create(output_filename.clone()) {
-        Ok(f) => f,
-        Err(err) => {
-            error!("Не могу создать файл {output_filename}: {err}");
-            std::process::exit(1);
-        }
-    };
-
-    // Save output file
-    for user in &statistic.users() {
-        for result in &statistic.results(user) {
-            let out = format!(
-                "{},{},{},{},{}\n",
-                result.testname,
-                result.username,
-                result.start_datetime.to_string(),
-                result.end_datetime.to_string(),
-                result.mark
-            );
-
-            print!("{}", out);
-            let _ = file.write(out.as_bytes());
-        }
-        println!();
-    }
-
-    Ok(())
 }
 
 /// Аргументы командной строки.
