@@ -151,7 +151,6 @@ impl Examiner {
                 0
             }
         };
-
         number_of_attempts <= 0 || self.db.attempts_counter(username, testname) < number_of_attempts
     }
 
@@ -249,5 +248,208 @@ impl Examiner {
             }
         }
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        network::Response,
+        schema::{Answer, Question},
+        settings::{self},
+        Config, Database,
+    };
+
+    use super::Examiner;
+
+    struct TDatabase {}
+
+    impl Database for TDatabase {
+        fn attempts_counter(&mut self, _username: &String, _testname: &String) -> u32 {
+            1
+        }
+
+        fn marks(&mut self, _username: &String, _testname: &String) -> Vec<f32> {
+            vec![3.0]
+        }
+
+        /// Сохранить баллы за тест testname для пользователя username.
+        fn append_mark(
+            &mut self,
+            _username: &String,
+            _testname: &String,
+            _mark: f32,
+            _start_timestamp: &String,
+            _end_timestamp: &String,
+        ) {
+        }
+    }
+
+    struct TConfig {}
+    impl Config for TConfig {
+        fn has_user(&self, username: &String) -> bool {
+            *username == "student".to_string()
+        }
+
+        fn has_test(&self, testname: &String) -> bool {
+            *testname == "math".to_string()
+        }
+
+        fn test_settings(&self, testname: &String) -> Option<settings::TestSettings> {
+            if *testname == "math".to_string() {
+                Some(settings::TestSettings {
+                    caption: "math".to_string(),
+                    questions_number: 1,
+                    test_duration_minutes: 1,
+                    number_of_attempts: 3,
+                    show_results: true,
+                    allowed_users: vec!["student".to_string()],
+                })
+            } else {
+                None
+            }
+        }
+
+        fn test_banner(&self, testname: &String) -> Option<String> {
+            if *testname == "math".to_string() {
+                Some("description".to_string())
+            } else {
+                None
+            }
+        }
+
+        fn question(&self, testname: &String, question_id: usize) -> Option<Question> {
+            if *testname == "math".to_string() && question_id == 0 {
+                Some(Question {
+                    question: "2+2".to_string(),
+                    answers: vec!["4".to_string(), "5".to_string()],
+                    correct_answer: Answer::new(vec![0]),
+                })
+            } else {
+                None
+            }
+        }
+
+        /// Получить количество вопросов в тесте.
+        fn questions_count(&self, testname: &String) -> Option<usize> {
+            if *testname == "math".to_string() {
+                Some(1)
+            } else {
+                None
+            }
+        }
+
+        fn answer(&self, testname: &String, question_id: usize) -> Option<Answer> {
+            if *testname == "math".to_string() && question_id == 0 {
+                Some(Answer::new(vec![0]))
+            } else {
+                None
+            }
+        }
+
+        fn has_access(&self, username: &String, testname: &String) -> bool {
+            *username == "student".to_string() && *testname == "math".to_string()
+        }
+
+        fn user_tests_list(&self, _username: &String) -> Vec<String> {
+            vec!["math".to_string()]
+        }
+
+        fn settings(&self) -> settings::Settings {
+            settings::Settings {
+                tests_directory_path: "example-config".to_string(),
+                result_path: "marks.db".to_string(),
+                server_address: "127.0.0.1:8080".to_string(),
+                tests: vec![self.test_settings(&"math".to_string()).unwrap()],
+                new_file_permissions: 0x660,
+            }
+        }
+    }
+
+    fn get_examiner() -> Examiner {
+        let config = TConfig {};
+        let database = TDatabase {};
+        Examiner::new(Box::new(config), Box::new(database))
+    }
+
+    #[test]
+    fn examiner_description() {
+        let mut examiner = get_examiner();
+        let resp = examiner.banner_to_start_test(&"student".to_string(), &"math".to_string());
+        assert_eq!(
+            resp,
+            Response::TestStarted {
+                banner: "description".to_string()
+            }
+        );
+
+        let resp = examiner.banner_to_start_test(&"student2".to_string(), &"math".to_string());
+        assert_eq!(resp, Response::NotAllowedUser);
+
+        let resp = examiner.banner_to_start_test(&"student".to_string(), &"math2".to_string());
+        assert_eq!(resp, Response::NotAllowedUser);
+
+        let resp = examiner.banner_to_start_test(&"student2".to_string(), &"math2".to_string());
+        assert_eq!(resp, Response::NotAllowedUser);
+    }
+
+    #[test]
+    fn examiner_avaliable_tests() {
+        let mut examiner = get_examiner();
+        let resp = examiner.avaliable_tests(&"username".to_string());
+        assert_eq!(resp, Response::NotAllowedUser);
+
+        let resp = examiner.avaliable_tests(&"student".to_string());
+        assert_eq!(
+            resp,
+            Response::AvaliableTests {
+                tests: vec![("math".to_string(), vec![3.0])]
+            }
+        );
+    }
+
+    #[test]
+    fn examiner_put_answer() {
+        let mut examiner = get_examiner();
+        let resp = examiner.put_answer(
+            &"student".to_string(),
+            &"math".to_string(),
+            &Answer::new(vec![1]),
+        );
+
+        assert_eq!(resp, Response::End { result: vec![3.0] });
+
+        let resp = examiner.put_answer(
+            &"student2".to_string(),
+            &"math".to_string(),
+            &Answer::new(vec![1]),
+        );
+
+        assert_eq!(resp, Response::NotAllowedUser);
+
+        let resp = examiner.put_answer(
+            &"student".to_string(),
+            &"math2".to_string(),
+            &Answer::new(vec![1]),
+        );
+
+        assert_eq!(resp, Response::NotAllowedUser);
+    }
+
+    #[test]
+    fn examiner_next_question() {
+        let mut examiner = get_examiner();
+        let resp = examiner.next_question(&"username".to_string(), &"math".to_string());
+        assert_eq!(resp, Response::NotAllowedUser);
+
+        let resp = examiner.next_question(&"student".to_string(), &"testname".to_string());
+        assert_eq!(resp, Response::NotAllowedUser);
+
+        let resp = examiner.next_question(&"student".to_string(), &"math".to_string());
+        let true_resp = Response::NextQuestion {
+            question: "2+2".to_string(),
+            answers: vec!["4".to_string(), "5".to_string()],
+        };
+        assert_eq!(resp, true_resp);
     }
 }

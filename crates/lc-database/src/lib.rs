@@ -207,16 +207,12 @@ impl Database for TestDatabase {
 
 #[cfg(test)]
 mod db_tests {
-    use std::str::FromStr;
-
-    use variants::{end_timestamp, start_timestamp};
-
     use super::*;
 
     #[test]
     fn init_database() {
         let db_path = "/tmp/lc_init_database.db";
-        let mut db = TestDatabase::new(db_path.to_string());
+        let _db = TestDatabase::new(db_path.to_string());
         std::fs::remove_file(db_path).unwrap();
     }
 

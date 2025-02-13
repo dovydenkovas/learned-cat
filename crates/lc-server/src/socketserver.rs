@@ -53,8 +53,9 @@ impl Server for SocketServer {
 
 #[cfg(test)]
 mod tests {
-    use learned_cat_interfaces::schema::Answer;
-    use network::Response;
+    use lc_examiner::network::Request;
+    use lc_examiner::network::Response;
+    use lc_examiner::schema::Answer;
     use std::{
         error::Error,
         thread::{self, sleep},

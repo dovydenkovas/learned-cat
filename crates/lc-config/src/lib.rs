@@ -142,7 +142,7 @@ impl Config for TomlConfig {
 
 #[cfg(test)]
 mod tests {
-    use learned_cat_interfaces::{
+    use lc_examiner::{
         schema::{Answer, Question},
         Config,
     };

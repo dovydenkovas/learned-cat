@@ -1,0 +1,11 @@
+#!/bin/bash -e
+
+for lib in crates/*
+do
+    cd $lib
+    echo "Run tests for " $lib
+    cargo test -q
+    cd ../..
+done
+
+cargo test -q

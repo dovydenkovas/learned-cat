@@ -14,7 +14,6 @@ use crate::Server;
 use lc_examiner::{
     examiner::Examiner,
     network::{Command, Request, Response},
-    Config, Database,
 };
 
 enum Tick {
@@ -40,21 +39,16 @@ pub struct ExamManager {
 }
 
 impl ExamManager {
-    pub fn new(
-        config: Box<dyn Config>,
-        db: Box<dyn Database>,
-        srv: Arc<Mutex<dyn Server + Sync + Send>>,
-    ) -> ExamManager {
+    pub fn new(examiner: Examiner, srv: Arc<Mutex<dyn Server + Sync + Send>>) -> ExamManager {
         let (c_tx, e_rx) = mpsc::channel();
         let (e_tx, c_rx) = mpsc::channel();
 
         let examiner_channel = ExaminerChannel { tx: e_tx, rx: e_rx };
-        let examiner = Examiner::new(config, db);
-
         let controller_channel = ContollerChannel {
             tx: c_tx,
             rx: Arc::new(Mutex::new(c_rx)),
         };
+
         ExamManager {
             srv,
             controller_channel,

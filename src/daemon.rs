@@ -1,5 +1,6 @@
 use clap::arg;
 use lc_database::TestDatabase;
+use lc_examiner::examiner::Examiner;
 use lc_exammanager::exammanager::ExamManager;
 use lc_reporter::Reporter;
 use lc_server::socketserver::SocketServer;
@@ -37,13 +38,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Сохранить результаты тестирования в файл
 fn export_results(root_path: PathBuf, output_filename: PathBuf) -> Result<(), Box<dyn Error>> {
-    // Load Statistic
+    // Подключаемся к настройкам и базе данных
     let config = TomlConfig::new(&root_path).unwrap();
     let tests_path = Path::new(&root_path).join(&config.settings().result_path.clone());
     let statistic: Box<dyn Statistic> =
         Box::new(TestDatabase::new(tests_path.to_str().unwrap().to_string()));
 
+    // Запускаем генератор отчетов
     let mut reporter: Box<dyn Reporter> =
         Box::new(lc_reporter::csv_reporter::CsvReporter::new(statistic));
 
@@ -55,21 +58,23 @@ fn export_results(root_path: PathBuf, output_filename: PathBuf) -> Result<(), Bo
 /// Запуск сервера.
 fn start_server(path: PathBuf) -> Result<(), Box<dyn Error>> {
     start_logger();
+
     set_daemon_dir(&path).expect("Невозможно перейти в директорию с файлами сервера.");
     debug!("Считываю настройки.");
     let config = TomlConfig::new(&path)?;
+
     debug!("Открываю базу данных.");
     let tests_path = Path::new(&path).join(&config.settings().result_path.clone());
     let database = TestDatabase::new(tests_path.to_str().unwrap().to_string());
+
     debug!("Запуска сервер.");
     let server = SocketServer::new(config.settings().server_address.clone());
 
+    debug!("Подготавливаю правила обработки тестов.");
+    let examiner = Examiner::new(Box::new(config), Box::new(database));
+
     debug!("Подготовка всех систем.");
-    let mut controller = ExamManager::new(
-        Box::new(config),
-        Box::new(database),
-        Arc::new(Mutex::new(server)),
-    );
+    let mut controller = ExamManager::new(examiner, Arc::new(Mutex::new(server)));
 
     debug!("Запуск.");
     controller.run();
