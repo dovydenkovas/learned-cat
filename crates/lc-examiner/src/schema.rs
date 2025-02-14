@@ -16,6 +16,10 @@ impl Answer {
         self.answers.push(answer);
         self.answers.sort();
     }
+
+    pub fn as_array(&self) -> Vec<usize> {
+        self.answers.clone()
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize, PartialEq)]

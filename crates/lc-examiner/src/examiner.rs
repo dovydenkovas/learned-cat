@@ -243,12 +243,32 @@ impl Examiner {
         let variant = self.variants.get_mut(username).unwrap();
         let mut result: f32 = 0.0;
         for i in 0..variant.answers.len() {
-            if variant.questions[i].correct_answer == variant.answers[i] {
-                result += 1.0;
-            }
+            result += check_answer(&variant.answers[i], &variant.questions[i].correct_answer);
         }
         result
     }
+}
+
+/// Проверка корректности ответа
+/// За правильный ответ начисляется `1 / n_true` баллов,
+/// где `n_true` - количество правильных ответов.
+/// Неправильный ответ нивелирует один правильный.
+/// При этом общий балл за вопрос не может быть меньше нуля или больше единицы.
+fn check_answer(answer: &Answer, correct_answer: &Answer) -> f32 {
+    let correct_answer = correct_answer.as_array();
+    let answer = answer.as_array();
+    let d = 1.0 / correct_answer.len() as f32;
+
+    let mut mark = 0.0;
+    for a in &answer {
+        if correct_answer.contains(a) {
+            mark += d;
+        } else {
+            mark -= d;
+        }
+    }
+
+    mark.clamp(0.0, 1.0)
 }
 
 #[cfg(test)]
@@ -260,7 +280,7 @@ mod tests {
         Config, Database,
     };
 
-    use super::Examiner;
+    use super::{check_answer, Examiner};
 
     struct TDatabase {}
 
@@ -451,5 +471,42 @@ mod tests {
             answers: vec!["4".to_string(), "5".to_string()],
         };
         assert_eq!(resp, true_resp);
+    }
+
+    #[test]
+    fn test_check_answer() {
+        assert_eq!(
+            check_answer(&Answer::new(vec![0]), &Answer::new(vec![0])),
+            1.0
+        );
+        assert_eq!(
+            check_answer(&Answer::new(vec![1]), &Answer::new(vec![0])),
+            0.0
+        );
+
+        assert_eq!(
+            check_answer(&Answer::new(vec![0, 1]), &Answer::new(vec![1])),
+            0.0
+        );
+        assert_eq!(
+            check_answer(&Answer::new(vec![0]), &Answer::new(vec![0, 1])),
+            0.5
+        );
+        assert_eq!(
+            check_answer(&Answer::new(vec![0, 1]), &Answer::new(vec![0, 1])),
+            1.0
+        );
+        assert_eq!(
+            check_answer(&Answer::new(vec![0, 1, 2]), &Answer::new(vec![0, 1])),
+            0.5
+        );
+        assert_eq!(
+            check_answer(&Answer::new(vec![0, 1, 2, 3]), &Answer::new(vec![0, 1])),
+            0.0
+        );
+        assert_eq!(
+            check_answer(&Answer::new(vec![0, 1, 2, 3, 4]), &Answer::new(vec![0, 1])),
+            0.0
+        );
     }
 }
