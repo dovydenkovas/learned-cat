@@ -1,6 +1,7 @@
 tests_directory_path = "tests"    # Путь к каталогу с файлами тестов
 result_path = "marks.db"          # Путь файла базы данных
 server_address = "127.0.0.1:8080" # Адрес сервера тестирования.
+log_level = "debug"               # debug, info, warn, error
 
 [[test]]
 caption = "linux"         # Название теста (необходимо для запуска теста и поиска файла теста)

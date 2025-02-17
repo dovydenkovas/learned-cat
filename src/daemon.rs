@@ -57,11 +57,10 @@ fn export_results(root_path: PathBuf, output_filename: PathBuf) -> Result<(), Bo
 
 /// Запуск сервера.
 fn start_server(path: PathBuf) -> Result<(), Box<dyn Error>> {
-    start_logger();
-
     set_daemon_dir(&path).expect("Невозможно перейти в директорию с файлами сервера.");
-    debug!("Считываю настройки.");
     let config = TomlConfig::new(&path)?;
+
+    start_logger(config.settings().log_level.clone());
 
     debug!("Открываю базу данных.");
     let tests_path = Path::new(&path).join(&config.settings().result_path.clone());
@@ -81,8 +80,23 @@ fn start_server(path: PathBuf) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn str2log_level(log_level: String) -> log::LevelFilter {
+    if log_level.as_str() == "debug" {
+        log::LevelFilter::Debug
+    } else if log_level.as_str() == "info" {
+        log::LevelFilter::Info
+    } else if log_level.as_str() == "warn" {
+        log::LevelFilter::Warn
+    } else if log_level.as_str() == "error" {
+        log::LevelFilter::Error
+    } else {
+        eprintln!("Уровень логирования установлен как debug");
+        log::LevelFilter::Debug
+    }
+}
+
 /// Настройка и запуск логирования
-fn start_logger() {
+fn start_logger(log_level: String) {
     let logconsole = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
             "[{d(%Y-%m-%d %H:%M:%S)} {h({l})}]: {M} - {m}\n",
@@ -103,7 +117,7 @@ fn start_logger() {
             Root::builder()
                 .appender("logconsole")
                 .appender("logfile")
-                .build(log::LevelFilter::Debug),
+                .build(str2log_level(log_level)),
         )
         .unwrap();
 

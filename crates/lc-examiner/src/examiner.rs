@@ -381,7 +381,7 @@ mod tests {
                 result_path: "marks.db".to_string(),
                 server_address: "127.0.0.1:8080".to_string(),
                 tests: vec![self.test_settings(&"math".to_string()).unwrap()],
-                new_file_permissions: 0x660,
+                log_level: "debug".to_string(),
             }
         }
     }

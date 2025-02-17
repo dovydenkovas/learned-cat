@@ -59,7 +59,7 @@ pub struct Settings {
     pub tests: Vec<TestSettings>,
 
     #[serde(default)]
-    pub new_file_permissions: u32,
+    pub log_level: String,
 }
 
 impl std::default::Default for Settings {
@@ -69,7 +69,7 @@ impl std::default::Default for Settings {
             result_path: "results".to_string(),
             server_address: "127.0.0.1:65001".to_string(),
             tests: vec![],
-            new_file_permissions: 0o640,
+            log_level: "debug".to_string(),
         }
     }
 }
