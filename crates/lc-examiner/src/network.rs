@@ -55,10 +55,17 @@ pub enum Command {
     PutAnswer { answer: Answer },
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub enum Marks {
+    Marks { marks: Vec<f32> },
+    Done,
+    Empty,
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Response {
     AvaliableTests {
-        tests: Vec<(String, Vec<f32>)>,
+        tests: Vec<(String, Marks)>,
     }, // Название теста и результат
     TestStarted {
         banner: String,
@@ -69,7 +76,7 @@ pub enum Response {
     },
     Ok,
     End {
-        result: Vec<f32>,
+        marks: Marks,
     },
     NotAllowedUser,
     ServerError,

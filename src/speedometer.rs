@@ -118,8 +118,7 @@ fn run_test(test_name: String, next_question: Option<Response>, n: &mut usize, k
                 );
 
                 match send_request(&put_answer_request, n) {
-                    Ok(Response::End { result }) => {
-                        println!("{:?}", result);
+                    Ok(Response::End { marks }) => {
                         break;
                     }
 
@@ -131,7 +130,7 @@ fn run_test(test_name: String, next_question: Option<Response>, n: &mut usize, k
                 }
             }
 
-            Ok(Response::End { result }) => {
+            Ok(Response::End { marks }) => {
                 break;
             }
 

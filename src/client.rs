@@ -9,7 +9,7 @@ use rustyline::DefaultEditor;
 use whoami;
 
 use lc_examiner::{
-    network::{Command, Request, Response},
+    network::{Command, Marks, Request, Response},
     schema::Answer,
 };
 
@@ -57,8 +57,8 @@ fn start_test(test_name: String) {
                 Some(Response::NextQuestion { question, answers }),
             ),
 
-            Response::End { result } => {
-                println!("Тест завершен. Ваш результат: {:?}", result);
+            Response::End { marks } => {
+                print_marks(marks);
             }
 
             _ => eprintln!("Теста не существует или доступ к нему закрыт."),
@@ -116,8 +116,8 @@ fn run_test(test_name: String, next_question: Option<Response>) {
                 );
 
                 match send_request(&put_answer_request) {
-                    Ok(Response::End { result }) => {
-                        println!("Тест завершен. Ваш результат: {:?}", result);
+                    Ok(Response::End { marks }) => {
+                        print_marks(marks);
                         break;
                     }
 
@@ -129,12 +129,27 @@ fn run_test(test_name: String, next_question: Option<Response>) {
                 }
             }
 
-            Ok(Response::End { result }) => {
-                println!("Тест завершен. Ваш результат: {:?}", result);
+            Ok(Response::End { marks }) => {
+                print_marks(marks);
                 break;
             }
 
             _ => (),
+        }
+    }
+}
+
+/// Вывод результата
+fn print_marks(marks: Marks) {
+    match marks {
+        Marks::Marks { marks } => {
+            println!("Ваш результат: {:?}", marks);
+        }
+        Marks::Done => {
+            println!("Тест завершён.");
+        }
+        Marks::Empty => {
+            println!("");
         }
     }
 }
@@ -210,7 +225,7 @@ fn print_avaliable_tests() {
 }
 
 /// Вывод таблицы ключ-значение
-fn print_table(values: Vec<(String, Vec<f32>)>) {
+fn print_table(values: Vec<(String, Marks)>) {
     let mut max_first = 0;
     for first in &values {
         max_first = std::cmp::max(max_first, first.0.len());
@@ -218,7 +233,8 @@ fn print_table(values: Vec<(String, Vec<f32>)>) {
 
     println!("{:>max_first$}   Ваш результат", "Тест");
     for first in &values {
-        println!("{:>max_first$} {:?}", first.0, first.1);
+        print!("{:>max_first$} ", first.0);
+        print_marks(first.1.clone());
     }
 }
 

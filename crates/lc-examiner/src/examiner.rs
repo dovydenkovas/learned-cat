@@ -4,6 +4,7 @@ use log::{debug, error};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
+use crate::network::Marks;
 use crate::schema::{Answer, Variant};
 use crate::{network::Response, schema::Question};
 use crate::{Config, Database};
@@ -41,13 +42,27 @@ impl Examiner {
                 "У пользователя {username} больше не осталось попыток на прохождение {testname}."
             );
             return Response::End {
-                result: self.db.marks(username, testname),
+                marks: self.get_marks(username, testname),
             };
         }
 
         // Отправить описание теста.
         Response::TestStarted {
             banner: self.config.test_banner(testname).unwrap_or("".to_string()),
+        }
+    }
+
+    /// Отправить результаты тестирования.
+    fn get_marks(&mut self, username: &String, testname: &String) -> Marks {
+        let marks = self.db.marks(username, testname);
+        if marks.is_empty() {
+            return Marks::Empty;
+        }
+
+        if self.config.test_settings(testname).unwrap().show_results {
+            Marks::Marks { marks }
+        } else {
+            Marks::Done
         }
     }
 
@@ -60,7 +75,7 @@ impl Examiner {
             let user_tests = self.config.user_tests_list(username);
             let mut tests = vec![];
             for test in &user_tests {
-                tests.push((test.clone(), self.db.marks(username, test)));
+                tests.push((test.clone(), self.get_marks(username, test)));
             }
             Response::AvaliableTests { tests }
         }
@@ -84,7 +99,7 @@ impl Examiner {
         if !self.is_user_have_opened_variant(username, testname) {
             error!("Тест завершен, нельзя отвечать на вопросы: {username}, {testname} {answer:?}");
             return Response::End {
-                result: self.db.marks(username, testname),
+                marks: self.get_marks(username, testname),
             };
         }
         self.push_answer_on_current_question(username, &answer);
@@ -107,7 +122,7 @@ impl Examiner {
                 "У пользователя {username} больше не осталось попыток на прохождение {testname}."
             );
             return Response::End {
-                result: self.db.marks(username, testname),
+                marks: self.get_marks(username, testname),
             };
         }
 
@@ -122,7 +137,7 @@ impl Examiner {
         } else {
             self.done_test(username, testname);
             Response::End {
-                result: self.db.marks(username, testname),
+                marks: self.get_marks(username, testname),
             }
         }
     }
@@ -437,7 +452,12 @@ mod tests {
             &Answer::new(vec![1]),
         );
 
-        assert_eq!(resp, Response::End { result: vec![3.0] });
+        assert_eq!(
+            resp,
+            Response::End {
+                marks: Marks::Marks { marks: vec![3.0] }
+            }
+        );
 
         let resp = examiner.put_answer(
             &"student2".to_string(),
