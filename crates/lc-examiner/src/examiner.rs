@@ -288,6 +288,7 @@ fn check_answer(answer: &Answer, correct_answer: &Answer) -> f32 {
 
 #[cfg(test)]
 mod tests {
+    use crate::network::Marks;
     use crate::{
         network::Response,
         schema::{Answer, Question},
@@ -338,7 +339,8 @@ mod tests {
                     test_duration_minutes: 1,
                     number_of_attempts: 3,
                     show_results: true,
-                    allowed_users: vec!["student".to_string()],
+                    allowed_users: Some(vec!["student".to_string()]),
+                    allowed_users_path: None,
                 })
             } else {
                 None
@@ -438,7 +440,7 @@ mod tests {
         assert_eq!(
             resp,
             Response::AvaliableTests {
-                tests: vec![("math".to_string(), vec![3.0])]
+                tests: vec![("math".to_string(), Marks::Marks { marks: vec![3.0] })]
             }
         );
     }

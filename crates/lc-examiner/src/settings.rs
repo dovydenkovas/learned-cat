@@ -1,5 +1,5 @@
 use crate::schema::Question;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Test {
@@ -7,7 +7,7 @@ pub struct Test {
     pub questions: Vec<Question>,
 }
 
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Serialize)]
 pub struct TestSettings {
     /// Basic info
     pub caption: String,
@@ -27,7 +27,10 @@ pub struct TestSettings {
     pub show_results: bool,
 
     #[serde(default)]
-    pub allowed_users: Vec<String>,
+    pub allowed_users: Option<Vec<String>>,
+
+    #[serde(default)]
+    pub allowed_users_path: Option<String>,
 }
 
 impl std::default::Default for TestSettings {
@@ -37,13 +40,14 @@ impl std::default::Default for TestSettings {
             questions_number: 0,
             test_duration_minutes: 0,
             show_results: true,
-            allowed_users: vec![],
+            allowed_users: Some(vec![]),
+            allowed_users_path: None,
             number_of_attempts: 1,
         }
     }
 }
 
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Serialize)]
 pub struct Settings {
     #[serde(default)]
     pub tests_directory_path: String,

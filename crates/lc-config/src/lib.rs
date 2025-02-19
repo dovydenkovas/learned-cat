@@ -50,7 +50,26 @@ impl TomlConfig {
             tests.insert(test.caption.clone(), questions);
 
             test_settings.insert(test.caption.clone(), test.clone());
-            for user in &test.allowed_users {
+
+            let mut users_arr = vec![];
+            if test.allowed_users.is_some() {
+                users_arr = [users_arr, test.allowed_users.as_ref().unwrap().clone()].concat();
+            }
+
+            if test.allowed_users_path.is_some() {
+                users_arr = [
+                    users_arr,
+                    std::fs::read_to_string(test.allowed_users_path.as_ref().unwrap())
+                        .unwrap()
+                        .replace("\n", " ")
+                        .split(" ")
+                        .map(|x| x.trim().to_string())
+                        .collect(),
+                ]
+                .concat();
+            };
+
+            for user in &users_arr {
                 if !users.contains_key(user) {
                     users.insert(user.clone(), HashSet::new());
                 }
@@ -195,7 +214,10 @@ mod tests {
         assert!(config.test_banner(&"astronomy".to_string()).is_none());
         let settings = config.test_settings(&"linux".to_string()).unwrap();
         assert_eq!(settings.caption, "linux");
-        assert_eq!(settings.allowed_users, vec!["asd", "student"]);
+        assert_eq!(
+            settings.allowed_users,
+            Some(vec!["asd".to_string(), "student".to_string()])
+        );
         assert_eq!(settings.number_of_attempts, 3);
     }
 

@@ -27,5 +27,5 @@ caption = "algo"
 questions_number = 10
 test_duration_minutes = 15
 show_results = true
-allowed_users = ["asd"]
 number_of_attempts = 0
+allowed_users_path = "users.txt"
