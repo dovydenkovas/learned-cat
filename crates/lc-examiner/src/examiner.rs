@@ -301,6 +301,7 @@ fn check_answer(answer: &Answer, correct_answer: &Answer) -> f32 {
 #[cfg(test)]
 mod tests {
     use crate::network::Marks;
+    use crate::schema::Variant;
     use crate::{
         network::Response,
         schema::{Answer, Question},
@@ -329,6 +330,7 @@ mod tests {
             _mark: f32,
             _start_timestamp: &String,
             _end_timestamp: &String,
+            _variant: &Variant,
         ) {
         }
     }

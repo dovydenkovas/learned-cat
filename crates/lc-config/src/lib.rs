@@ -63,12 +63,14 @@ impl TomlConfig {
             if test.allowed_users_path.is_some() {
                 users_arr = [
                     users_arr,
-                    std::fs::read_to_string(test.allowed_users_path.as_ref().unwrap())
-                        .unwrap()
-                        .replace("\n", " ")
-                        .split(" ")
-                        .map(|x| x.trim().to_string())
-                        .collect(),
+                    std::fs::read_to_string(
+                        root_path.join(test.allowed_users_path.as_ref().unwrap()),
+                    )
+                    .unwrap()
+                    .replace("\n", " ")
+                    .split(" ")
+                    .map(|x| x.trim().to_string())
+                    .collect(),
                 ]
                 .concat();
             };
@@ -206,7 +208,7 @@ mod tests {
         assert_eq!(asd_tests, vec!["algo", "linux", "python"]);
         assert_eq!(
             config.user_tests_list(&"student".to_string()),
-            vec!["linux"]
+            vec!["linux", "python"]
         );
         assert_eq!(
             config.user_tests_list(&"tux".to_string()),

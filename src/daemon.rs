@@ -153,8 +153,8 @@ fn start_logger(log_level: String) {
 /// Аргументы командной строки.
 fn arguments() -> clap::ArgMatches {
     clap::Command::new("learned-cat-server")
-        .version("1.0.0")
-        .author("Aleksandr Dovydenkov. <asdovydenkov@gmail.com>")
+        .version("0.2.0")
+        .author("Aleksandr Dovydenkov <asdovydenkov@yandex.ru>")
         .about("Сервер тестирования в терминале. ")
 
         .subcommand(

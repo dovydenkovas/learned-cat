@@ -359,8 +359,9 @@ mod db_tests {
     }
 
     fn fill_database(db: &mut TestDatabase) {
-        let start_time = "0".to_string();
-        let end_time = "1".to_string();
+        let start_time = "2025-01-26 13:33:41.789001340 +03:00".to_string();
+        let end_time = "2025-01-26 13:33:41.789001340 +03:00".to_string();
+
         db.append_mark(
             &"vlad".to_string(),
             &"math".to_string(),
@@ -370,13 +371,12 @@ mod db_tests {
             &lc_examiner::schema::Variant {
                 username: "vlad".to_string(),
                 testname: "math".to_string(),
-                start_timestamp: start_time.clone(),
+                start_timestamp: chrono::offset::Local::now(),
                 questions: vec![],
                 answers: vec![],
             },
         );
-        let start_time = "2".to_string();
-        let end_time = "3".to_string();
+
         db.append_mark(
             &"sveta".to_string(),
             &"math".to_string(),
@@ -386,7 +386,7 @@ mod db_tests {
             &lc_examiner::schema::Variant {
                 username: "sveta".to_string(),
                 testname: "math".to_string(),
-                start_timestamp: start_time.clone(),
+                start_timestamp: chrono::offset::Local::now(),
                 questions: vec![],
                 answers: vec![],
             },
@@ -403,7 +403,7 @@ mod db_tests {
             &lc_examiner::schema::Variant {
                 username: "artem".to_string(),
                 testname: "history".to_string(),
-                start_timestamp: start_time.clone(),
+                start_timestamp: chrono::offset::Local::now(),
                 questions: vec![],
                 answers: vec![],
             },
@@ -419,7 +419,7 @@ mod db_tests {
             &lc_examiner::schema::Variant {
                 username: "vlad".to_string(),
                 testname: "math".to_string(),
-                start_timestamp: start_time.clone(),
+                start_timestamp: chrono::offset::Local::now(),
                 questions: vec![],
                 answers: vec![],
             },
@@ -433,16 +433,13 @@ mod db_tests {
 
         fill_database(&mut db);
 
+        assert_eq!(db.marks(&"artem".to_string(), &"math".to_string()), vec![]);
         assert_eq!(
-            db.results(&"artem".to_string(), &"math".to_string()),
-            vec![]
-        );
-        assert_eq!(
-            db.results(&"vlad".to_string(), &"math".to_string()),
+            db.marks(&"vlad".to_string(), &"math".to_string()),
             vec![5.0, 3.2]
         );
         assert_eq!(
-            db.results(&"sveta".to_string(), &"math".to_string()),
+            db.marks(&"sveta".to_string(), &"math".to_string()),
             vec![8.8]
         );
 
