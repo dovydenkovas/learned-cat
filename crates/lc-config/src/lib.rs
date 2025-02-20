@@ -154,7 +154,7 @@ impl Config for TomlConfig {
     /// Проверить доступность теста testname для пользователя username.
     fn has_access(&self, username: &String, testname: &String) -> bool {
         self.public_tests.contains(testname)
-            || self.has_user(username) && self.users[username].contains(testname)
+            || self.has_user(username) && self.users.get(username).unwrap_or(&HashSet::new()).contains(testname)
     }
 
     /// Получить список тестов, доступных пользователю username.
