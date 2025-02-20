@@ -244,8 +244,14 @@ impl Examiner {
         let mark = self.calculate_mark(username);
         let start_time = self.variants[username].start_timestamp.to_string();
         let end_time = chrono::Local::now().to_string();
-        self.db
-            .append_mark(username, testname, mark, &start_time, &end_time);
+        self.db.append_mark(
+            username,
+            testname,
+            mark,
+            &start_time,
+            &end_time,
+            &self.variants[username],
+        );
         debug!(
             "Пользователь {username} завершил тест {testname}: {:?}.",
             self.variants[username]

@@ -1,6 +1,8 @@
 use diesel::{insert_into, prelude::*};
-use lc_reporter::{Statistic, TestRecord};
+use lc_reporter::{AnswerRecord, QuestionRecord, VariantRecord};
+use lc_reporter::{MarkRecord, Statistic};
 use log::error;
+use std::collections::HashMap;
 use std::process::exit;
 
 pub mod models;
@@ -52,6 +54,27 @@ impl TestDatabase {
         )
         .execute(&mut connection);
 
+        let _ = diesel::sql_query(
+            r#"
+        CREATE TABLE questions (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            variant_id NOT NULL,
+            text TEXT NOT NULL
+        );"#,
+        )
+        .execute(&mut connection);
+
+        let _ = diesel::sql_query(
+            r#"
+        CREATE TABLE answers (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            question_id INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            is_correct BOOLEAN,
+            is_selected BOOLEAN
+        );"#,
+        )
+        .execute(&mut connection);
         TestDatabase { connection }
     }
 
@@ -96,6 +119,80 @@ impl TestDatabase {
 
         test_id.unwrap()
     }
+
+    fn append_questions(&mut self, variant_id: i32, variant: &lc_examiner::schema::Variant) {
+        for i in 0..variant.answers.len() {
+            let question = variant.questions[i].clone();
+
+            insert_into(questions::table)
+                .values((
+                    questions::text.eq(question.question.clone()),
+                    questions::variant_id.eq(variant_id),
+                ))
+                .execute(&mut self.connection)
+                .unwrap();
+
+            let question_id = questions::dsl::questions
+                .filter(questions::variant_id.eq(variant_id))
+                .filter(questions::text.eq(question.question))
+                .select(questions::id)
+                .get_result::<i32>(&mut self.connection)
+                .unwrap();
+
+            let answers_arr = variant.answers[i].as_array();
+            for j in 0..question.answers.len() {
+                insert_into(answers::table)
+                    .values((
+                        answers::text.eq(question.answers[j].clone()),
+                        answers::question_id.eq(question_id),
+                        answers::is_selected.eq(answers_arr.contains(&j)),
+                        answers::is_correct.eq(question.correct_answer.as_array().contains(&j)),
+                    ))
+                    .execute(&mut self.connection)
+                    .unwrap();
+            }
+        }
+    }
+
+    fn get_questions_records(&mut self, variant_id: i32) -> Vec<QuestionRecord> {
+        let answers = answers::table
+            .inner_join(questions::table)
+            .filter(questions::variant_id.eq(variant_id))
+            .select((Question::as_select(), Answer::as_select())) //, Test::as_select()))
+            .load::<(Question, Answer)>(&mut self.connection)
+            .unwrap();
+
+        let mut questions: HashMap<i32, QuestionRecord> = HashMap::new();
+        for p in answers {
+            let answer: Answer = p.1;
+            let question: Question = p.0;
+
+            if !questions.contains_key(&question.id) {
+                questions.insert(
+                    question.id,
+                    QuestionRecord {
+                        question: question.text,
+                        answers: vec![],
+                    },
+                );
+            }
+
+            questions
+                .get_mut(&question.id)
+                .unwrap()
+                .answers
+                .push(AnswerRecord {
+                    answer: answer.text,
+                    is_correct: answer.is_correct,
+                    is_selected: answer.is_selected,
+                })
+        }
+        let mut result = vec![];
+        for question in questions {
+            result.push(question.1);
+        }
+        result
+    }
 }
 
 impl Statistic for TestDatabase {
@@ -108,7 +205,7 @@ impl Statistic for TestDatabase {
     }
 
     /// Список результатов конкретного пользователя.
-    fn results(&mut self, username: &String) -> Vec<TestRecord> {
+    fn results(&mut self, username: &String) -> Vec<MarkRecord> {
         let variants_req = variants::table
             .inner_join(users::table)
             .filter(users::name.eq(username))
@@ -117,7 +214,7 @@ impl Statistic for TestDatabase {
             .load::<(Variant, User, Test)>(&mut self.connection)
             .unwrap();
 
-        let mut results = Vec::<TestRecord>::new();
+        let mut results = Vec::<MarkRecord>::new();
         for variant in variants_req {
             let start_datetime = chrono::DateTime::parse_from_str(
                 variant.0.start_timestamp.as_str(),
@@ -130,7 +227,7 @@ impl Statistic for TestDatabase {
             )
             .unwrap();
 
-            results.push(TestRecord {
+            results.push(MarkRecord {
                 username: variant.1.name,
                 testname: variant.2.caption,
                 mark: variant.0.mark,
@@ -139,6 +236,43 @@ impl Statistic for TestDatabase {
             });
         }
 
+        results
+    }
+
+    /// Ответы пользователя на вопросы одного теста
+    fn variants(&mut self, username: &String, testname: &String) -> Vec<VariantRecord> {
+        let variants_req = variants::table
+            .inner_join(users::table)
+            .filter(users::name.eq(username))
+            .inner_join(tests::table)
+            .filter(tests::caption.eq(testname))
+            .select((Variant::as_select(), User::as_select(), Test::as_select())) //, Test::as_select()))
+            .load::<(Variant, User, Test)>(&mut self.connection)
+            .unwrap();
+
+        let mut results = Vec::<VariantRecord>::new();
+        for variant in variants_req {
+            let start_datetime = chrono::DateTime::parse_from_str(
+                variant.0.start_timestamp.as_str(),
+                "%Y-%m-%d %H:%M:%S.%f %z",
+            )
+            .unwrap();
+            let end_datetime = chrono::DateTime::parse_from_str(
+                variant.0.end_timestamp.as_str(),
+                "%Y-%m-%d %H:%M:%S.%f %z",
+            )
+            .unwrap();
+
+            let mark = variant.0.mark;
+            let questions = self.get_questions_records(variant.0.id);
+
+            results.push(VariantRecord {
+                mark,
+                end_datetime,
+                start_datetime,
+                questions,
+            });
+        }
         results
     }
 }
@@ -177,10 +311,10 @@ impl Database for TestDatabase {
         mark_value: f32,
         start_time: &String,
         end_time: &String,
+        variant: &lc_examiner::schema::Variant,
     ) {
         let user_id_f = self.append_user(username.clone());
         let test_id_f = self.append_test(testname.clone());
-
         let mark_id = variants::dsl::variants
             .filter(variants::start_timestamp.eq(&start_time))
             .filter(variants::end_timestamp.eq(&end_time))
@@ -188,20 +322,28 @@ impl Database for TestDatabase {
             .filter(variants::test_id.eq(test_id_f))
             .select(variants::id)
             .get_result::<i32>(&mut self.connection);
-        if mark_id.is_ok() {
-            return;
+        if mark_id.is_err() {
+            insert_into(variants::table)
+                .values((
+                    variants::user_id.eq(user_id_f),
+                    variants::test_id.eq(test_id_f),
+                    variants::mark.eq(mark_value),
+                    variants::start_timestamp.eq(start_time.clone()),
+                    variants::end_timestamp.eq(end_time.clone()),
+                ))
+                .execute(&mut self.connection)
+                .unwrap();
         }
-
-        insert_into(variants::table)
-            .values((
-                variants::user_id.eq(user_id_f),
-                variants::test_id.eq(test_id_f),
-                variants::mark.eq(mark_value),
-                variants::start_timestamp.eq(start_time.clone()),
-                variants::end_timestamp.eq(end_time.clone()),
-            ))
-            .execute(&mut self.connection)
+        let mark_id = variants::dsl::variants
+            .filter(variants::start_timestamp.eq(&start_time))
+            .filter(variants::end_timestamp.eq(&end_time))
+            .filter(variants::user_id.eq(user_id_f))
+            .filter(variants::test_id.eq(test_id_f))
+            .select(variants::id)
+            .get_result::<i32>(&mut self.connection)
             .unwrap();
+
+        self.append_questions(mark_id, variant);
     }
 }
 
@@ -225,6 +367,13 @@ mod db_tests {
             5.0,
             &start_time,
             &end_time,
+            &lc_examiner::schema::Variant {
+                username: "vlad".to_string(),
+                testname: "math".to_string(),
+                start_timestamp: start_time.clone(),
+                questions: vec![],
+                answers: vec![],
+            },
         );
         let start_time = "2".to_string();
         let end_time = "3".to_string();
@@ -234,6 +383,13 @@ mod db_tests {
             8.8,
             &start_time,
             &end_time,
+            &lc_examiner::schema::Variant {
+                username: "sveta".to_string(),
+                testname: "math".to_string(),
+                start_timestamp: start_time.clone(),
+                questions: vec![],
+                answers: vec![],
+            },
         );
         let start_datetime = "2025-01-26 13:33:41.789001340 +03:00".to_string();
 
@@ -244,6 +400,13 @@ mod db_tests {
             4.83,
             &start_datetime,
             &end_datetime,
+            &lc_examiner::schema::Variant {
+                username: "artem".to_string(),
+                testname: "history".to_string(),
+                start_timestamp: start_time.clone(),
+                questions: vec![],
+                answers: vec![],
+            },
         );
         let start_time = "5".to_string();
         let end_time = "6".to_string();
@@ -253,6 +416,13 @@ mod db_tests {
             3.2,
             &start_time,
             &end_time,
+            &lc_examiner::schema::Variant {
+                username: "vlad".to_string(),
+                testname: "math".to_string(),
+                start_timestamp: start_time.clone(),
+                questions: vec![],
+                answers: vec![],
+            },
         );
     }
 
@@ -263,13 +433,16 @@ mod db_tests {
 
         fill_database(&mut db);
 
-        assert_eq!(db.marks(&"artem".to_string(), &"math".to_string()), vec![]);
         assert_eq!(
-            db.marks(&"vlad".to_string(), &"math".to_string()),
+            db.results(&"artem".to_string(), &"math".to_string()),
+            vec![]
+        );
+        assert_eq!(
+            db.results(&"vlad".to_string(), &"math".to_string()),
             vec![5.0, 3.2]
         );
         assert_eq!(
-            db.marks(&"sveta".to_string(), &"math".to_string()),
+            db.results(&"sveta".to_string(), &"math".to_string()),
             vec![8.8]
         );
 
@@ -328,7 +501,7 @@ mod db_tests {
         let db_path = "/tmp/lc_statistic.db";
         let mut db = TestDatabase::new(db_path.to_string());
 
-        assert_eq!(db.results(&"artem".to_string()), vec![] as Vec<TestRecord>);
+        assert_eq!(db.results(&"artem".to_string()), vec![] as Vec<MarkRecord>);
         fill_database(&mut db);
 
         let res = db.results(&"artem".to_string());
@@ -343,7 +516,7 @@ mod db_tests {
         )
         .unwrap();
 
-        let expected = vec![TestRecord {
+        let expected = vec![MarkRecord {
             username: "artem".to_string(),
             testname: "history".to_string(),
             mark: 4.83,

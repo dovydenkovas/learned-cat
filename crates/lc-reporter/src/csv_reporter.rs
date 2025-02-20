@@ -14,7 +14,7 @@ impl CsvReporter {
 
 impl Reporter for CsvReporter {
     /// Сохранение результатов тестирования в файл.
-    fn save_report(&mut self, filename: PathBuf) {
+    fn marks_report(&mut self, filename: PathBuf) {
         // Create output file
         let mut file = match std::fs::File::create(&filename) {
             Ok(f) => f,
@@ -41,5 +41,39 @@ impl Reporter for CsvReporter {
             }
             println!();
         }
+    }
+
+    /// Созранение вариантов пользователя в файл.
+    fn variants_report(&mut self, username: &String, testname: &String) {
+        let variant_report = self.statistic.variants(username, testname);
+
+        println!(
+            "# Результаты теста {} для пользователя {}\n",
+            testname, username
+        );
+        for variant in variant_report {
+            println!("## Вариант от {}", variant.start_datetime);
+            println!("### Завершен {}", variant.end_datetime);
+            println!("### Оценка {}", variant.mark);
+            println!("### Вопросы: ");
+            for question in variant.questions {
+                println!("#### {} ", question.question);
+                for answer in question.answers {
+                    if answer.is_selected {
+                        print!("- [x] ");
+                    } else {
+                        print!("- [ ] ");
+                    }
+
+                    if answer.is_correct {
+                        println!(" _{}_", answer.answer);
+                    } else {
+                        println!(" {}", answer.answer);
+                    }
+                }
+                println!("");
+            }
+        }
+        println!("");
     }
 }

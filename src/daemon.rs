@@ -26,11 +26,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some(("run", _)) => {
             start_server(root_path)?
         },
-        Some(("export-results", args)) => {
+        Some(("export-marks", args)) => {
             let output_filename = PathBuf::from(args.get_one::<String>("filename")
                              .or(Some(&"output.csv".to_string()))
                              .unwrap());
-            export_results(root_path, output_filename)?
+            export_marks(root_path, output_filename)?
+        },
+        Some(("export-variants", args)) => {
+            let username = args.get_one::<String>("user").unwrap();
+            let testname = args.get_one::<String>("test").unwrap();
+            export_variants(root_path, &username, &testname)?
         },
         Some((&_, _)) => error!("Неизвестная команда."),
         None => error!("Необходимо указать команду. Для просмотра доступных команд используйте переметр --help"),
@@ -39,7 +44,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// Сохранить результаты тестирования в файл
-fn export_results(root_path: PathBuf, output_filename: PathBuf) -> Result<(), Box<dyn Error>> {
+fn export_marks(root_path: PathBuf, output_filename: PathBuf) -> Result<(), Box<dyn Error>> {
     // Подключаемся к настройкам и базе данных
     let config = TomlConfig::new(&root_path).unwrap();
     let tests_path = Path::new(&root_path).join(&config.settings().result_path.clone());
@@ -50,7 +55,28 @@ fn export_results(root_path: PathBuf, output_filename: PathBuf) -> Result<(), Bo
     let mut reporter: Box<dyn Reporter> =
         Box::new(lc_reporter::csv_reporter::CsvReporter::new(statistic));
 
-    reporter.save_report(output_filename);
+    reporter.marks_report(output_filename);
+
+    Ok(())
+}
+
+/// Сохранить результаты тестирования в файл
+fn export_variants(
+    root_path: PathBuf,
+    username: &String,
+    testname: &String,
+) -> Result<(), Box<dyn Error>> {
+    // Подключаемся к настройкам и базе данных
+    let config = TomlConfig::new(&root_path).unwrap();
+    let tests_path = Path::new(&root_path).join(&config.settings().result_path.clone());
+    let statistic: Box<dyn Statistic> =
+        Box::new(TestDatabase::new(tests_path.to_str().unwrap().to_string()));
+
+    // Запускаем генератор отчетов
+    let mut reporter: Box<dyn Reporter> =
+        Box::new(lc_reporter::csv_reporter::CsvReporter::new(statistic));
+
+    reporter.variants_report(username, testname);
 
     Ok(())
 }
@@ -138,12 +164,19 @@ fn arguments() -> clap::ArgMatches {
         )
 
         .subcommand(
-            clap::Command::new("export-results")
-                .short_flag('o')
+            clap::Command::new("export-marks")
+                .short_flag('m')
                 .about("экспортировать результаты тестирования в виде csv таблицы следующего формата: <test>,<student>,<time_begin>,<time_end>,<result>")
                 .arg(arg!([filename]).required(true)),
         )
 
+        .subcommand(
+                    clap::Command::new("export-variants")
+                        .short_flag('v')
+                        .about("экспортировать варианты тестов пользователя")
+                        .arg(arg!([user]).required(true))
+                        .arg(arg!([test]).required(true))
+                )
         .get_matches()
 }
 

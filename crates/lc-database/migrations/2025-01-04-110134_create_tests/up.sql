@@ -17,3 +17,16 @@ CREATE TABLE variants (
     start_timestamp VARCHAR NOT NULL,
     end_timestamp VARCHAR NOT NULL
 );
+
+CREATE TABLE question (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    variant_id NOT NULL text TEXT NOT NULL
+);
+
+CREATE TABLE answer (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    question_id INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    is_correct BOOLEAN,
+    is_selected BOOLEAN
+);

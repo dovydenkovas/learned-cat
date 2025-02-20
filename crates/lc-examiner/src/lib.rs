@@ -3,7 +3,7 @@ pub mod network;
 pub mod schema;
 pub mod settings;
 
-use schema::{Answer, Question};
+use schema::{Answer, Question, Variant};
 use settings::{Settings, TestSettings};
 
 /// Интерфейс взаимодействия Экзаменатора с настройками.
@@ -55,5 +55,6 @@ pub trait Database {
         mark: f32,
         start_timestamp: &String,
         end_timestamp: &String,
+        variant: &Variant,
     );
 }
