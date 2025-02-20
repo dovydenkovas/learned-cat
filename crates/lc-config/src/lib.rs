@@ -100,7 +100,7 @@ impl TomlConfig {
 impl Config for TomlConfig {
     /// Существует ли пользователь?
     fn has_user(&self, username: &String) -> bool {
-        self.users.contains_key(username)
+        self.users.contains_key(username) || !self.public_tests.is_empty()
     }
 
     /// Проверить валидность теста testname.
@@ -160,7 +160,10 @@ impl Config for TomlConfig {
     /// Получить список тестов, доступных пользователю username.
     fn user_tests_list(&self, username: &String) -> Vec<String> {
         if self.has_user(username) {
-            let mut tests: Vec<String> = self.users[username].clone().into_iter().collect();
+            let mut tests: Vec<String> = vec![];
+            if self.users.contains_key(username) {
+                tests.extend(self.users[username].clone().into_iter());
+            }
             tests.extend(self.public_tests.clone().into_iter());
             return tests;
         }
