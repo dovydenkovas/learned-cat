@@ -37,14 +37,17 @@ pub fn read_test(path: &Path) -> Test {
         match state {
             ParseState::TestBanner => {
                 if line.starts_with("#") {
+                    banner = banner.trim().to_string();
                     state = ParseState::ReadQuestion;
                 } else {
                     banner += &line;
+                    banner += "\n";
                 }
             }
 
             ParseState::ReadQuestion => {
                 if line.starts_with("*") || line.starts_with("+") || line.starts_with("-") {
+                    question.question = question.question.trim().to_string();
                     state = ParseState::ReadAnswer;
                 }
             }
@@ -69,6 +72,7 @@ pub fn read_test(path: &Path) -> Test {
         match state {
             ParseState::ReadQuestion => {
                 question.question += line.to_string().split("#").last().unwrap().trim();
+                question.question += "\n";
             }
 
             ParseState::ReadAnswer => {
