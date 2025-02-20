@@ -27,6 +27,9 @@ pub struct TomlConfig {
 
     // Таблица пользователь: список доступных тестов.
     users: HashMap<String, HashSet<String>>,
+    // Список тестов, доступных всем.
+    public_tests: HashSet<String>,
+
     // Таблица тест: настройки.
     tests: HashMap<String, Test>,
     test_settings: HashMap<String, TestSettings>,
@@ -43,6 +46,7 @@ impl TomlConfig {
         let mut tests = HashMap::new();
         let mut test_settings = HashMap::new();
 
+        let mut public_tests = HashSet::new(); // Тесты, доступные всем пользователям
         let path = root_path.join(&settings.tests_directory_path);
         for test in &settings.tests {
             let test_path = path.join(test.caption.clone() + ".md");
@@ -75,11 +79,16 @@ impl TomlConfig {
                 }
                 users.get_mut(user).unwrap().insert(test.caption.clone());
             }
+
+            if test.allowed_users.is_none() && test.allowed_users_path.is_none() {
+                public_tests.insert(test.caption.clone());
+            }
         }
 
         Ok(TomlConfig {
             settings,
             users,
+            public_tests,
             tests,
             test_settings,
         })
@@ -142,13 +151,16 @@ impl Config for TomlConfig {
 
     /// Проверить доступность теста testname для пользователя username.
     fn has_access(&self, username: &String, testname: &String) -> bool {
-        self.has_user(username) && self.users[username].contains(testname)
+        self.public_tests.contains(testname)
+            || self.has_user(username) && self.users[username].contains(testname)
     }
 
     /// Получить список тестов, доступных пользователю username.
     fn user_tests_list(&self, username: &String) -> Vec<String> {
         if self.has_user(username) {
-            return self.users[username].clone().into_iter().collect();
+            let mut tests: Vec<String> = self.users[username].clone().into_iter().collect();
+            tests.extend(self.public_tests.clone().into_iter());
+            return tests;
         }
         vec![]
     }

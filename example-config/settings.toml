@@ -8,7 +8,7 @@ caption = "linux"         # Название теста (необходимо д
 questions_number = 2      # Количество вопросов, которые необходимо выбрать для генерации варианта
 test_duration_minutes = 5 # Ограничение тестирования по времени
 show_results = true       # Показывать ли баллы пользователю
-# Имена пользователей, имеющих право выполнять тест
+# Имена пользователей, имеющих право выполнять тест, отсутствие параметра = тест доступен всем пользователям
 allowed_users = ["asd", "student"]
 number_of_attempts = 3             # Разрешенное количество попыток
 
@@ -18,7 +18,6 @@ caption = "python"
 questions_number = 2
 test_duration_minutes = 5
 show_results = true
-allowed_users = ["asd"]
 number_of_attempts = 1
 
 

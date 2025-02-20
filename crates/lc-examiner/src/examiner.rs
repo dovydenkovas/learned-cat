@@ -200,7 +200,13 @@ impl Examiner {
         vec.shuffle(&mut thread_rng());
 
         let mut questions: Vec<Question> = vec![];
-        for i in 0..test_settings.questions_number {
+        let mut questions_number = test_settings.questions_number;
+        if questions_number <= 0
+            || questions_number >= self.config.questions_count(testname).unwrap()
+        {
+            questions_number = self.config.questions_count(testname).unwrap();
+        }
+        for i in 0..questions_number {
             questions.push(self.config.question(testname, vec[i]).unwrap().clone());
         }
 
