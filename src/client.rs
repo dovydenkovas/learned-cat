@@ -4,7 +4,6 @@ use std::error::Error;
 use std::io::prelude::*;
 use std::net::TcpStream;
 
-use clap::Parser;
 use rustyline::DefaultEditor;
 use whoami;
 
@@ -13,29 +12,37 @@ use lc_examiner::{
     schema::Answer,
 };
 
-/// Структура аргументов командной строки.
-#[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-struct Cli {
-    /// Название теста.
-    name: Option<String>,
-
-    /// Отобразить доступные тесты.
-    #[arg(short, long)]
-    list: bool,
-}
-
 /// Парсит аргументы и запускает соответствующее действие.
 fn main() {
-    let cli = Cli::parse();
-    if let Some(name) = cli.name {
-        start_test(name);
-    } else if cli.list {
-        print_avaliable_tests();
-    } else {
-        println!("Для запуска действия укажите имя теста");
-        print_avaliable_tests();
+    match std::env::args().nth(1) {
+        Some(v) => match v.as_str() {
+            "-l" | "--list" => print_avaliable_tests(),
+            "-h" | "--help" => print_help(),
+            "-V" | "--version" => println!("learned-cat 0.2.0"),
+            test => start_test(test.to_string()),
+        },
+        None => print_help(),
     }
+}
+
+fn print_help() {
+    println!(
+        r#"Использование:
+    - Для запуска теста:
+        learned-cat [НАЗВАНИЕ_ТЕСТА]
+
+    - Для получения информации:
+        learned-cat [ПАРАМЕТР]
+
+
+ПАРАМЕТРЫ:
+    -l, --list     Отобразить доступные тесты
+    -h, --help     Показать эту справку
+    -V, --version  Отобразить номер версии
+
+Об ошибках сообщайте asdovydenkov@yandex.ru
+Последняя версия доступна по адресу: https://github.com/dovydenkovas/learned-cat"#
+    );
 }
 
 /// Обслуживает процесс тестирования.
@@ -46,7 +53,7 @@ fn start_test(test_name: String) {
         Ok(response) => match response {
             Response::TestStarted { banner } => {
                 println!("{banner}");
-                println!("Вы готовы начать тестирование? (Введите <да> или <нет>)");
+                println!("Вы готовы начать тестирование? (y/n)");
                 if ask_yes() {
                     run_test(test_name, None);
                 }
@@ -62,9 +69,9 @@ fn start_test(test_name: String) {
                 print_marks(marks);
             }
 
-            _ => eprintln!("Теста не существует или доступ к нему закрыт."),
+            _ => print_help(),
         },
-        Err(err) => eprintln!("Ошибка связи с сервером: {}", err.to_string()),
+        Err(_) => eprintln!("Ошибка связи с сервером. Пожалуйста, повторите попытку позже."),
     }
 }
 
@@ -163,7 +170,7 @@ fn print_marks(marks: Marks) {
 /// Задает вопрос
 fn ask_question(question: String, answers: Vec<String>) -> Vec<usize> {
     println!("");
-    println!("{:>len$}", "***", len = question.len() / 2 - 1);
+    println!("        ***");
     println!("{question}");
     for i in 0..answers.len() {
         println!("{}) {}", i + 1, answers[i]);
@@ -226,7 +233,7 @@ fn print_avaliable_tests() {
             }
             _ => eprintln!("Ошибка чтения списка тестов."),
         },
-        Err(err) => eprintln!("Ошибка связи с сервером: {}", err.to_string()),
+        Err(_) => eprintln!("Ошибка связи с сервером. Пожалуйста, повторите попытку позже."),
     }
 }
 
