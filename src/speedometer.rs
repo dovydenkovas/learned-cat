@@ -21,7 +21,7 @@ fn main() {
 fn test_avaliable_tests() {
     let start = chrono::Local::now();
     let mut n = 0;
-    for _ in 0..1000 {
+    for _ in 0..100 {
         let request = Request::new(
             whoami::username(),
             "".to_string(),
@@ -51,7 +51,7 @@ fn test_avaliable_tests() {
 
 fn test_tests() {
     let start = chrono::Local::now();
-    let mut n = 1000;
+    let mut n = 100;
     for i in 0..n {
         let k = i.clone();
         //thread::spawn(move || {

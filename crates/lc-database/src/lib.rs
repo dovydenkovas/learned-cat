@@ -85,15 +85,11 @@ impl TestDatabase {
             .get_result::<i32>(&mut self.connection);
 
         if user_id.is_err() {
-            insert_into(users::table)
+            let user: User = insert_into(users::table)
                 .values((users::name.eq(username.clone()),))
-                .execute(&mut self.connection)
+                .get_result(&mut self.connection)
                 .unwrap();
-
-            user_id = users::dsl::users
-                .filter(users::name.eq(&username))
-                .select(users::id)
-                .get_result::<i32>(&mut self.connection);
+            user_id = Ok(user.id);
         }
 
         user_id.unwrap()
@@ -106,15 +102,11 @@ impl TestDatabase {
             .get_result::<i32>(&mut self.connection);
 
         if test_id.is_err() {
-            insert_into(tests::table)
+            let test: Test = insert_into(tests::table)
                 .values((tests::caption.eq(testname.clone()),))
-                .execute(&mut self.connection)
+                .get_result(&mut self.connection)
                 .unwrap();
-
-            test_id = tests::dsl::tests
-                .filter(tests::caption.eq(&testname))
-                .select(tests::id)
-                .get_result::<i32>(&mut self.connection);
+            test_id = Ok(test.id);
         }
 
         test_id.unwrap()
@@ -124,33 +116,30 @@ impl TestDatabase {
         for i in 0..variant.answers.len() {
             let question = variant.questions[i].clone();
 
-            insert_into(questions::table)
+            let added_question: Question = insert_into(questions::table)
                 .values((
                     questions::text.eq(question.question.clone()),
                     questions::variant_id.eq(variant_id),
                 ))
-                .execute(&mut self.connection)
+                .get_result(&mut self.connection)
                 .unwrap();
 
-            let question_id = questions::dsl::questions
-                .filter(questions::variant_id.eq(variant_id))
-                .filter(questions::text.eq(question.question))
-                .select(questions::id)
-                .get_result::<i32>(&mut self.connection)
-                .unwrap();
-
+            let question_id = added_question.id; 
             let answers_arr = variant.answers[i].as_array();
+            let mut insertable = vec![];
+
             for j in 0..question.answers.len() {
-                insert_into(answers::table)
-                    .values((
+                    insertable.push((
                         answers::text.eq(question.answers[j].clone()),
                         answers::question_id.eq(question_id),
                         answers::is_selected.eq(answers_arr.contains(&j)),
-                        answers::is_correct.eq(question.correct_answer.as_array().contains(&j)),
-                    ))
+                        answers::is_correct.eq(question.correct_answer.as_array().contains(&j))));
+            }
+                insert_into(answers::table)
+                    .values(&insertable)
                     .execute(&mut self.connection)
                     .unwrap();
-            }
+
         }
     }
 

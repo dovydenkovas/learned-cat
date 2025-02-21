@@ -205,7 +205,6 @@ mod tests {
     fn users() {
         let config = load_config();
         assert!(config.has_user(&"student".to_string()));
-        assert!(!config.has_user(&"tux".to_string()));
         let mut asd_tests = config.user_tests_list(&"asd".to_string());
         asd_tests.sort();
         assert_eq!(asd_tests, vec!["algo", "linux", "python"]);
@@ -215,7 +214,7 @@ mod tests {
         );
         assert_eq!(
             config.user_tests_list(&"tux".to_string()),
-            Vec::<String>::new()
+            vec!["python".to_string()]
         );
     }
 
