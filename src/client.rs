@@ -58,6 +58,7 @@ fn start_test(test_name: String) {
             ),
 
             Response::End { marks } => {
+                print!("Тест завершён. Ваш результат: ");
                 print_marks(marks);
             }
 
@@ -117,6 +118,7 @@ fn run_test(test_name: String, next_question: Option<Response>) {
 
                 match send_request(&put_answer_request) {
                     Ok(Response::End { marks }) => {
+                        print!("Тест завершён. Ваш результат: ");
                         print_marks(marks);
                         break;
                     }
@@ -130,6 +132,7 @@ fn run_test(test_name: String, next_question: Option<Response>) {
             }
 
             Ok(Response::End { marks }) => {
+                print!("Тест завершён. Ваш результат: ");
                 print_marks(marks);
                 break;
             }
@@ -143,7 +146,10 @@ fn run_test(test_name: String, next_question: Option<Response>) {
 fn print_marks(marks: Marks) {
     match marks {
         Marks::Marks { marks } => {
-            println!("Ваш результат: {:?}", marks);
+            for mark in marks {
+                print!("{mark:.2} ");
+            }
+            println!("");
         }
         Marks::Done => {
             println!("Тест завершён.");
