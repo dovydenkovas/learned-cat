@@ -7,7 +7,6 @@ use lc_server::socketserver::SocketServer;
 use log4rs::append::{console::ConsoleAppender, file::FileAppender};
 use log4rs::config::{Appender, Root};
 use log4rs::encode::pattern::PatternEncoder;
-use std::env::set_current_dir;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -15,27 +14,27 @@ use std::sync::{Arc, Mutex};
 use log::{debug, error};
 
 use lc_config::TomlConfig;
-use lc_examiner::Config;
+use lc_examiner::{Config, Paths};
 use lc_reporter::Statistic;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = arguments();
-    let root_path = daemon_dir_path();
+    let paths = Paths::new();
 
     match arguments.subcommand() {
         Some(("run", _)) => {
-            start_server(root_path)?
+            start_server(paths)?
         },
         Some(("export-marks", args)) => {
             let output_filename = PathBuf::from(args.get_one::<String>("filename")
                              .or(Some(&"output.csv".to_string()))
                              .unwrap());
-            export_marks(root_path, output_filename)?
+            export_marks(paths, output_filename)?
         },
         Some(("export-variants", args)) => {
             let username = args.get_one::<String>("user").unwrap();
             let testname = args.get_one::<String>("test").unwrap();
-            export_variants(root_path, &username, &testname)?
+            export_variants(paths, &username, &testname)?
         },
         Some((&_, _)) => error!("Неизвестная команда."),
         None => error!("Необходимо указать команду. Для просмотра доступных команд используйте переметр --help"),
@@ -44,10 +43,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// Сохранить результаты тестирования в файл
-fn export_marks(root_path: PathBuf, output_filename: PathBuf) -> Result<(), Box<dyn Error>> {
+fn export_marks(paths: Paths, output_filename: PathBuf) -> Result<(), Box<dyn Error>> {
     // Подключаемся к настройкам и базе данных
-    let config = TomlConfig::new(&root_path).unwrap();
-    let tests_path = Path::new(&root_path).join(&config.settings().result_path.clone());
+    let config = TomlConfig::new(&paths).unwrap();
+    let tests_path = Path::new(&paths.database).join(&config.settings().result_path.clone());
     let statistic: Box<dyn Statistic> =
         Box::new(TestDatabase::new(tests_path.to_str().unwrap().to_string()));
 
@@ -62,13 +61,13 @@ fn export_marks(root_path: PathBuf, output_filename: PathBuf) -> Result<(), Box<
 
 /// Сохранить результаты тестирования в файл
 fn export_variants(
-    root_path: PathBuf,
+    lc_paths: Paths,
     username: &String,
     testname: &String,
 ) -> Result<(), Box<dyn Error>> {
     // Подключаемся к настройкам и базе данных
-    let config = TomlConfig::new(&root_path).unwrap();
-    let tests_path = Path::new(&root_path).join(&config.settings().result_path.clone());
+    let config = TomlConfig::new(&lc_paths).unwrap();
+    let tests_path = Path::new(&lc_paths.database).join(&config.settings().result_path.clone());
     let statistic: Box<dyn Statistic> =
         Box::new(TestDatabase::new(tests_path.to_str().unwrap().to_string()));
 
@@ -82,14 +81,13 @@ fn export_variants(
 }
 
 /// Запуск сервера.
-fn start_server(path: PathBuf) -> Result<(), Box<dyn Error>> {
-    set_daemon_dir(&path).expect("Невозможно перейти в директорию с файлами сервера.");
-    let config = TomlConfig::new(&path)?;
+fn start_server(lc_paths: Paths) -> Result<(), Box<dyn Error>> {
+    let config = TomlConfig::new(&lc_paths)?;
 
     start_logger(config.settings().log_level.clone());
 
     debug!("Открываю базу данных.");
-    let tests_path = Path::new(&path).join(&config.settings().result_path.clone());
+    let tests_path = Path::new(&lc_paths.database).join(&config.settings().result_path.clone());
     let database = TestDatabase::new(tests_path.to_str().unwrap().to_string());
 
     debug!("Запуска сервер.");
@@ -178,25 +176,4 @@ fn arguments() -> clap::ArgMatches {
                         .arg(arg!([test]).required(true))
                 )
         .get_matches()
-}
-
-/// Путь к файлам сервера
-fn daemon_dir_path() -> PathBuf {
-    match std::env::var("LEARNED_CAT_PATH") {
-        Ok(v) => PathBuf::from(v),
-        Err(_) => PathBuf::from("/opt/learned-cat"),
-    }
-}
-
-/// Перейти в директорию с файлами сервера
-fn set_daemon_dir<P: AsRef<Path>>(path: P) -> Result<(), Box<dyn Error>> {
-    if set_current_dir(path.as_ref()).is_err() {
-        error!(
-            "Ошибка доступа к каталогу сервера {}.",
-            path.as_ref().to_str().unwrap()
-        );
-        error!("Проверьте, что каталог существует, и у процесса есть у нему доступ.");
-        return Err(Box::new(std::fmt::Error));
-    }
-    Ok(())
 }

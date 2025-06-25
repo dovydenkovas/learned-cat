@@ -1,9 +1,9 @@
 
-function _tests_list() {
-    latest="${COMP_WORDS[$COMP_CWORD]}" 
+function _lc_daemon() {
+    latest="${COMP_WORDS[$COMP_CWORD]}"
     prev="${COMP_WORDS[$COMP_CWORD - 1]}"
     words=""
-    
+
     if [[ $COMP_CWORD == 1 ]]; then
         words="run export-marks export-variants help"
     else
@@ -24,4 +24,4 @@ function _tests_list() {
     return 0
 }
 
-complete -F _tests_list learned-cat-daemon
+complete -F _lc_daemon learned-cat-daemon

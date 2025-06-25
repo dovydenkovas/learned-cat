@@ -2,9 +2,10 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    default,
     fs::File,
     io::Read,
-    path::Path,
+    path::{Path, PathBuf},
     rc::Rc,
 };
 
@@ -18,7 +19,7 @@ mod parsetest;
 use lc_examiner::{
     schema::{Answer, Question},
     settings::{Settings, Test, TestSettings},
-    Config,
+    Config, Paths,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -36,8 +37,8 @@ pub struct TomlConfig {
 }
 
 impl TomlConfig {
-    pub fn new(root_path: &Path) -> Result<TomlConfig, Box<dyn Error>> {
-        let settings_path = root_path.join("settings.toml");
+    pub fn new(lc_paths: &Paths) -> Result<TomlConfig, Box<dyn Error>> {
+        let settings_path = lc_paths.settings.join("settings.toml");
         let mut file = File::open(settings_path)?;
         let mut settings = String::new();
         file.read_to_string(&mut settings)?;
@@ -47,7 +48,7 @@ impl TomlConfig {
         let mut test_settings = HashMap::new();
 
         let mut public_tests = HashSet::new(); // Тесты, доступные всем пользователям
-        let path = root_path.join(&settings.tests_directory_path);
+        let path = lc_paths.settings.join(&settings.tests_directory_path);
         for test in &settings.tests {
             let test_path = path.join(test.caption.clone() + ".md");
             let questions = read_test(&test_path);
@@ -64,7 +65,9 @@ impl TomlConfig {
                 users_arr = [
                     users_arr,
                     std::fs::read_to_string(
-                        root_path.join(test.allowed_users_path.as_ref().unwrap()),
+                        lc_paths
+                            .settings
+                            .join(test.allowed_users_path.as_ref().unwrap()),
                     )
                     .unwrap()
                     .replace("\n", " ")
@@ -154,7 +157,12 @@ impl Config for TomlConfig {
     /// Проверить доступность теста testname для пользователя username.
     fn has_access(&self, username: &String, testname: &String) -> bool {
         self.public_tests.contains(testname)
-            || self.has_user(username) && self.users.get(username).unwrap_or(&HashSet::new()).contains(testname)
+            || self.has_user(username)
+                && self
+                    .users
+                    .get(username)
+                    .unwrap_or(&HashSet::new())
+                    .contains(testname)
     }
 
     /// Получить список тестов, доступных пользователю username.
@@ -180,15 +188,17 @@ impl Config for TomlConfig {
 mod tests {
     use lc_examiner::{
         schema::{Answer, Question},
-        Config,
+        Config, Paths,
     };
     use std::path::Path;
+    use std::path::PathBuf;
 
     use crate::TomlConfig;
 
     fn load_config() -> TomlConfig {
-        let path = Path::new("../../example-config/");
-        let conf = TomlConfig::new(path);
+        let mut path = Paths::new();
+        path.settings = PathBuf::from("../../example-config/");
+        let conf = TomlConfig::new(&path);
         assert!(conf.is_ok());
         conf.unwrap()
     }

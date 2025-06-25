@@ -3,8 +3,34 @@ pub mod network;
 pub mod schema;
 pub mod settings;
 
+use std::path::PathBuf;
+
 use schema::{Answer, Question, Variant};
 use settings::{Settings, TestSettings};
+
+/// Директории, содержащие файлы программы.
+pub struct Paths {
+    /// Директория хранения настроек и тестов, по умолчанию /etc/learned-cat.
+    pub settings: PathBuf,
+    /// Директория сохранения результатов, по умолчанию /var/lib/learned-cat.
+    pub database: PathBuf,
+}
+
+impl Paths {
+    pub fn new() -> Paths {
+        let settings = match std::env::var("LEARNED_CAT_SETTINGS") {
+            Ok(v) => PathBuf::from(v),
+            Err(_) => PathBuf::from("/etc/learned-cat"),
+        };
+
+        let database = match std::env::var("LEARNED_CAT_DATABASE") {
+            Ok(v) => PathBuf::from(v),
+            Err(_) => PathBuf::from("/var/lib/learned-cat"),
+        };
+
+        Paths { settings, database }
+    }
+}
 
 /// Интерфейс взаимодействия Экзаменатора с настройками.
 pub trait Config {
