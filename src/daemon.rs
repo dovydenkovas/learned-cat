@@ -14,12 +14,12 @@ use std::sync::{Arc, Mutex};
 use log::{debug, error};
 
 use lc_config::TomlConfig;
-use lc_examiner::{Config, Paths};
+use lc_examiner::{Config, DaemonPaths};
 use lc_reporter::Statistic;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = arguments();
-    let paths = Paths::new();
+    let paths = DaemonPaths::new();
 
     match arguments.subcommand() {
         Some(("run", _)) => {
@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// Сохранить результаты тестирования в файл
-fn export_marks(paths: Paths, output_filename: PathBuf) -> Result<(), Box<dyn Error>> {
+fn export_marks(paths: DaemonPaths, output_filename: PathBuf) -> Result<(), Box<dyn Error>> {
     // Подключаемся к настройкам и базе данных
     let config = TomlConfig::new(&paths).unwrap();
     let tests_path = Path::new(&paths.database).join(&config.settings().result_path.clone());
@@ -61,7 +61,7 @@ fn export_marks(paths: Paths, output_filename: PathBuf) -> Result<(), Box<dyn Er
 
 /// Сохранить результаты тестирования в файл
 fn export_variants(
-    lc_paths: Paths,
+    lc_paths: DaemonPaths,
     username: &String,
     testname: &String,
 ) -> Result<(), Box<dyn Error>> {
@@ -81,7 +81,7 @@ fn export_variants(
 }
 
 /// Запуск сервера.
-fn start_server(lc_paths: Paths) -> Result<(), Box<dyn Error>> {
+fn start_server(lc_paths: DaemonPaths) -> Result<(), Box<dyn Error>> {
     let config = TomlConfig::new(&lc_paths)?;
 
     start_logger(config.settings().log_level.clone());

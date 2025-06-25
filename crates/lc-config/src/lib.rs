@@ -19,7 +19,7 @@ mod parsetest;
 use lc_examiner::{
     schema::{Answer, Question},
     settings::{Settings, Test, TestSettings},
-    Config, Paths,
+    Config, DaemonPaths,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -37,7 +37,7 @@ pub struct TomlConfig {
 }
 
 impl TomlConfig {
-    pub fn new(lc_paths: &Paths) -> Result<TomlConfig, Box<dyn Error>> {
+    pub fn new(lc_paths: &DaemonPaths) -> Result<TomlConfig, Box<dyn Error>> {
         let settings_path = lc_paths.settings.join("settings.toml");
         let mut file = File::open(settings_path)?;
         let mut settings = String::new();
@@ -188,7 +188,7 @@ impl Config for TomlConfig {
 mod tests {
     use lc_examiner::{
         schema::{Answer, Question},
-        Config, Paths,
+        Config, DaemonPaths,
     };
     use std::path::Path;
     use std::path::PathBuf;
@@ -196,7 +196,7 @@ mod tests {
     use crate::TomlConfig;
 
     fn load_config() -> TomlConfig {
-        let mut path = Paths::new();
+        let mut path = DaemonPaths::new();
         path.settings = PathBuf::from("../../example-config/");
         let conf = TomlConfig::new(&path);
         assert!(conf.is_ok());

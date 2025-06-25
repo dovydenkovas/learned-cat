@@ -9,15 +9,15 @@ use schema::{Answer, Question, Variant};
 use settings::{Settings, TestSettings};
 
 /// Директории, содержащие файлы программы.
-pub struct Paths {
+pub struct DaemonPaths {
     /// Директория хранения настроек и тестов, по умолчанию /etc/learned-cat.
     pub settings: PathBuf,
     /// Директория сохранения результатов, по умолчанию /var/lib/learned-cat.
     pub database: PathBuf,
 }
 
-impl Paths {
-    pub fn new() -> Paths {
+impl DaemonPaths {
+    pub fn new() -> DaemonPaths {
         let settings = match std::env::var("LEARNED_CAT_SETTINGS") {
             Ok(v) => PathBuf::from(v),
             Err(_) => PathBuf::from("/etc/learned-cat"),
@@ -28,7 +28,7 @@ impl Paths {
             Err(_) => PathBuf::from("/var/lib/learned-cat"),
         };
 
-        Paths { settings, database }
+        DaemonPaths { settings, database }
     }
 }
 
