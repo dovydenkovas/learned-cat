@@ -84,7 +84,7 @@ fn export_variants(
 fn start_server(lc_paths: DaemonPaths) -> Result<(), Box<dyn Error>> {
     let config = TomlConfig::new(&lc_paths)?;
 
-    start_logger(config.settings().log_level.clone());
+    start_logger(&lc_paths, config.settings().log_level.clone());
 
     debug!("Открываю базу данных.");
     let tests_path = Path::new(&lc_paths.database).join(&config.settings().result_path.clone());
@@ -120,18 +120,17 @@ fn str2log_level(log_level: String) -> log::LevelFilter {
 }
 
 /// Настройка и запуск логирования
-fn start_logger(log_level: String) {
+fn start_logger(lc_paths: &DaemonPaths, log_level: String) {
     let logconsole = ConsoleAppender::builder()
-        .encoder(Box::new(PatternEncoder::new(
-            "[{d(%Y-%m-%d %H:%M:%S)} {h({l})}]: {M} - {m}\n",
-        )))
+        .encoder(Box::new(PatternEncoder::new("[{l}]: {M} - {m}\n")))
         .build();
 
+    let filename = lc_paths.database.join("output.log");
     let logfile = FileAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
             "[{d(%Y-%m-%d %H:%M:%S)} {l}]: {M} - {m}\n",
         )))
-        .build("log/output.log")
+        .build(filename)
         .unwrap();
 
     let config = log4rs::Config::builder()

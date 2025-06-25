@@ -1,0 +1,15 @@
+[Unit]
+Description=Learned cat, tests and quiz server.
+After=network.target
+
+[Service]
+User=learned-cat
+Group=learned-cat
+WorkingDirectory=/var/lib/learned-cat
+ExecStart=/usr/bin/learned-cat-daemon run
+ExecReload=/usr/bin/learned-cat-daemon reload 
+Type=simple
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
