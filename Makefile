@@ -27,7 +27,7 @@ install: uninstall add_user all update
 
 add_user:
 	@echo "Добавляю пользователя learned-cat"
-	@sudo useradd -r -s /usr/sbin/nologin -M learned-cat || echo "Пользователь уже существует"
+	@sudo useradd -r -s /sbin/nologin -M learned-cat || echo "Пользователь уже существует"
 
 update: add_user all
 	@echo "Установка learned-cat"

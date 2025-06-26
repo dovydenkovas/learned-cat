@@ -1,0 +1,31 @@
+#!/sbin/openrc-run
+
+name="learned-cat-daemon"
+description="Learned cat, tests and quiz server."
+
+depend() {
+  after bootmisc
+}
+
+start() {
+  ebegin "Starting ${name}"
+  runuser -u learned-cat -- /usr/bin/learned-cat-daemon run > /dev/null &
+  eend $?
+}
+
+stop() {
+  ebegin "Stopping ${name}"
+  killall learned-cat-daemon
+  eend $?
+}
+
+reload() {
+  ebegin "Reloading ${name}"
+  /usr/bin/learned-cat-daemon reload
+  eend $?
+}
+
+status() {
+  /usr/bin/learned-cat-daemon status
+  return $?
+}
