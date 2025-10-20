@@ -142,14 +142,14 @@ fn run_test(test_name: String, next_question: Option<Response>, n: &mut usize, k
 /// Осуществляет связь с сервером.
 fn send_request(request: &Request, n: &mut usize) -> Result<Response, Box<dyn Error>> {
     *n += 1;
-    let request = bincode::serialize(&request)?;
+    let request = serde_json::to_vec(&request)?;
     let mut response = [0 as u8; 1_000_000];
 
     let mut stream = TcpStream::connect(get_server_address())?;
     stream.write(&request)?;
     let n_bytes = stream.read(&mut response)?;
 
-    let response = bincode::deserialize::<Response>(&response[..n_bytes])?;
+    let response = serde_json::from_slice::<Response>(&response[..n_bytes])?;
     match response {
         Response::ServerError => {
             println!("Произошли технические шоколадки :(");

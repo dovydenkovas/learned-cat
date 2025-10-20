@@ -32,7 +32,7 @@ impl Server for SocketServer {
                 let mut request = [0 as u8; 5000];
                 let n_bytes = stream.read(&mut request).unwrap();
                 let request =
-                    bincode::deserialize::<network::Request>(&request[0..n_bytes]).unwrap();
+                    serde_json::from_slice::<network::Request>(&request[0..n_bytes]).unwrap();
 
                 self.stream = Some(stream);
                 debug!("{request:?}");
@@ -44,7 +44,7 @@ impl Server for SocketServer {
 
     /// Отправить ответ на запрос.
     fn push_response(&mut self, response: network::Response) {
-        let response = bincode::serialize(&response).unwrap();
+        let response = serde_json::to_vec(&response).unwrap();
         if self.stream.is_some() {
             let _ = self.stream.as_mut().unwrap().write(&response);
         }
@@ -67,14 +67,14 @@ mod tests {
 
     /// Осуществляет связь с сервером.
     fn send_request(request: &Request, listen: String) -> Result<Response, Box<dyn Error>> {
-        let request = bincode::serialize(&request)?;
+        let request = serde_json::to_vec(&request)?;
         let mut response = [0 as u8; 1_000_000];
 
         let mut stream = TcpStream::connect(listen)?;
         stream.write(&request)?;
         let n_bytes = stream.read(&mut response)?;
 
-        let response = bincode::deserialize::<Response>(&response[..n_bytes])?;
+        let response = serde_json::from_slice::<Response>(&response[..n_bytes])?;
         match response {
             Response::ServerError => {
                 std::process::exit(1);

@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4.39"
-diesel = { version = "2.2.0", features = [
+diesel = { version = "^2.3.0", features = [
     "sqlite",
     "returning_clauses_for_sqlite_3_35",
 ] }
