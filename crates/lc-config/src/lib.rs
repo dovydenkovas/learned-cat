@@ -2,7 +2,6 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    default,
     fs::File,
     io::Read,
     path::{Path, PathBuf},
@@ -17,6 +16,7 @@ use toml::from_str;
 mod parsetest;
 
 use lc_examiner::{
+    pexpect::Pexpect,
     schema::{Answer, Question},
     settings::{Settings, Test, TestSettings},
     Config, DaemonPaths,
@@ -39,10 +39,13 @@ pub struct TomlConfig {
 impl TomlConfig {
     pub fn new(lc_paths: &DaemonPaths) -> Result<TomlConfig, Box<dyn Error>> {
         let settings_path = lc_paths.settings.join("settings.toml");
-        let mut file = File::open(settings_path)?;
+        let mut file =
+            File::open(&settings_path).pexpect(format!("Ошибка открытия файла {settings_path:?}."));
         let mut settings = String::new();
-        file.read_to_string(&mut settings)?;
-        let mut settings: Settings = from_str(&settings)?;
+        file.read_to_string(&mut settings)
+            .pexpect("Ошибка чтения файла настроек.");
+        let mut settings: Settings =
+            from_str(&settings).pexpect("Синтаксическая ошибка в файле настроек.");
         let mut users = HashMap::new();
         let mut tests = HashMap::new();
         let mut test_settings = HashMap::new();

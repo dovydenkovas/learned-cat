@@ -8,6 +8,8 @@ use std::path::PathBuf;
 use schema::{Answer, Question, Variant};
 use settings::{Settings, TestSettings};
 
+pub mod pexpect;
+
 /// Директории, содержащие файлы программы.
 pub struct DaemonPaths {
     /// Директория хранения настроек и тестов, по умолчанию /etc/learned-cat.
